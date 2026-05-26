@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carousel Asset Generator Pro</title>
+    
+    <link rel="icon" href="favicon.ico">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            yellow: '#eddc01',
+                            blue: '#0146bc',
+                            bluedark: '#013896',
+                            gray: '#f3f4f6'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Stili Flat per gli Input Range (Sliders) */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            background: #0146bc;
+            cursor: pointer;
+            border: none;
+            border-radius: 0;
+            margin-top: -7px;
+        }
+        input[type=range]:disabled::-webkit-slider-thumb {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 0;
+        }
+        input[type=range]::-moz-range-thumb {
+            height: 20px;
+            width: 20px;
+            background: #0146bc;
+            cursor: pointer;
+            border: none;
+            border-radius: 0;
+        }
+        input[type=range]:disabled::-moz-range-thumb {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 0;
+        }
+
+        /* Playground Scroll-Snap */
+        .snap-container {
+            scroll-snap-type: x mandatory;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .snap-container::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .snap-item {
+            scroll-snap-align: center;
+            flex-shrink: 0;
+            height: 100% !important;
+            width: auto !important;
+            object-fit: contain;
+        }
+
+        /* Bottoni Flat */
+        .btn-primary {
+            background-color: #0146bc;
+            color: white;
+            border: 2px solid #0146bc;
+            border-radius: 0;
+            padding: 0.5rem 1.5rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            font-size: 0.875rem;
+            letter-spacing: 0.05em;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #013896;
+            border-color: #013896;
+        }
+        .btn-primary:disabled {
+            background-color: #94a3b8;
+            border-color: #94a3b8;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background-color: transparent;
+            color: #0146bc;
+            border: 2px solid #0146bc;
+            border-radius: 0;
+            padding: 0.5rem 1.5rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            font-size: 0.875rem;
+            letter-spacing: 0.05em;
+            transition: background-color 0.2s;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-800 antialiased min-h-screen flex flex-col">
+
+    <header class="bg-brand-blue py-6 px-4 border-b-4 border-brand-yellow">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <h1 class="text-white text-2xl font-bold tracking-wide uppercase">Carousel Generator</h1>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col max-w-6xl mx-auto w-full p-4 md:p-8">
+        
+        <section id="section-setup" class="mb-12 max-w-lg border border-gray-200 p-6 bg-brand-gray">
+            <h2 class="text-xl font-bold text-brand-blue mb-4 uppercase">1. Configurazione Progetto</h2>
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="text-sm font-semibold text-gray-600 block mb-1">Nuovo Progetto (inserisci nome)</label>
+                    <input type="text" id="project-name" placeholder="Es. Campagna_Autunno" class="w-full border-2 border-gray-300 p-3 outline-none focus:border-brand-blue transition-colors rounded-none">
+                </div>
+                
+                <div class="flex flex-col sm:flex-row gap-3 mt-2 border-b border-gray-300 pb-6">
+                    <button id="btn-start" class="btn-primary flex-1" onclick="startProject(this)">Inizia Vuoto</button>
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold text-gray-600 block mb-2">Hai già un file salvato?</label>
+                    <button class="btn-secondary w-full border-gray-400 text-gray-600 hover:text-brand-blue hover:border-brand-blue" onclick="document.getElementById('import-upload').click()">
+                        Importa da File JSON
+                    </button>
+                    <input type="file" id="import-upload" class="hidden" accept=".json" onchange="handleImportJSON(event)">
+                </div>
+            </div>
+        </section>
+
+        <section id="section-upload" class="mb-12 max-w-md hidden">
+            <h2 class="text-xl font-bold text-brand-blue mb-4 uppercase">2. Caricamento Asset</h2>
+            <div class="border-2 border-dashed border-gray-400 bg-brand-gray p-8 text-center cursor-pointer hover:border-brand-blue transition-colors" onclick="document.getElementById('file-upload').click()">
+                <svg class="w-12 h-12 mx-auto text-brand-blue mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                <span class="font-semibold text-gray-700">Seleziona un'immagine in formato landscape</span>
+                <span class="block text-sm text-gray-500 mt-1">Nessun limite di risoluzione</span>
+                <input type="file" id="file-upload" class="hidden" accept="image/png, image/jpeg" onchange="handleImageUpload(event)">
+            </div>
+        </section>
+
+        <section id="section-editor" class="hidden flex-col gap-8 w-full">
+            <div class="border-b-2 border-gray-200 pb-4 flex justify-between items-end">
+                <div>
+                    <h2 class="text-xl font-bold text-brand-blue uppercase">3. Ritaglio e Adattamento Carousel (4:5)</h2>
+                    <p class="text-sm text-gray-500 font-medium" id="display-project-name">Progetto: -</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <div class="lg:col-span-1 flex flex-col gap-5 bg-brand-gray p-6 border border-gray-200">
+                    <h3 class="font-bold text-brand-blue uppercase text-sm border-b border-gray-300 pb-2">Controlli Immagine</h3>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Ingrandimento</label>
+                        <input type="range" id="slider-scale" step="0.001" value="1" oninput="updateEditorState()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Sposta Orizzontalmente</label>
+                        <input type="range" id="slider-x" step="1" value="0" oninput="updateEditorState()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Sposta Verticalmente</label>
+                        <input type="range" id="slider-y" step="1" value="0" oninput="updateEditorState()">
+                    </div>
+                    
+                    <div id="exclude-container" class="mt-2 pt-4 border-t border-gray-300">
+                        <label class="flex justify-between text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                            <span>Escludi frame finali</span>
+                            <span id="exclude-value" class="text-brand-blue font-bold text-base bg-white px-2 py-0.5 border border-gray-300">0</span>
+                        </label>
+                        <input type="range" id="slider-exclude" min="0" max="0" step="1" value="0" oninput="updateEditorState()">
+                        <p class="text-[10px] text-gray-500 mt-1 uppercase">Rimuove i frame da destra</p>
+                    </div>
+                    
+                    <div class="mt-6 pt-5 border-t-2 border-gray-300 flex flex-col gap-3">
+                        <button class="btn-secondary w-full" onclick="openPlayground(this)">Testa Carousel</button>
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="btn-secondary text-xs px-1 col-span-1 flex justify-center items-center gap-1" onclick="exportProjectJSON(this)">
+                                Salva JSON
+                            </button>
+                            <button class="btn-primary text-xs px-1 col-span-1 flex justify-center items-center gap-1" onclick="exportCarousel(this)">
+                                Esporta ZIP
+                            </button>
+                        </div>
+
+                        <button class="text-red-600 font-bold uppercase text-[11px] mt-4 tracking-wider hover:underline text-center" onclick="resetApp()">
+                            Ricomincia da Capo (Reset)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-3 overflow-x-auto bg-gray-100 border border-gray-300 pb-4">
+                    <div id="crop-area" class="relative h-[350px] md:h-[500px] overflow-hidden origin-top-left" style="width: 0px;">
+                        <img id="preview-img" class="absolute top-0 left-0 origin-top-left pointer-events-none max-w-none" style="width: auto; height: auto;" src="" alt="preview">
+                        <div id="grid-container" class="absolute inset-0 flex pointer-events-none">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="modal-playground" class="fixed inset-0 z-50 bg-gray-900/95 hidden flex-col justify-center items-center p-4">
+        <div class="absolute top-6 right-6">
+            <button class="text-white hover:text-brand-yellow font-bold text-lg uppercase tracking-widest" onclick="closePlayground()">Chiudi X</button>
+        </div>
+        
+        <p class="text-brand-yellow mb-6 text-sm uppercase tracking-widest font-bold bg-brand-blue px-4 py-1">Simulatore Swipe Instagram (4:5)</p>
+        
+        <div class="w-full max-w-[360px] aspect-[4/5] bg-black border-[12px] border-gray-800 rounded-[24px] shadow-2xl overflow-hidden relative">
+            <div id="playground-container" class="snap-container flex w-full h-full bg-black">
+                </div>
+        </div>
+        <p class="text-gray-400 mt-4 text-xs">Scorri orizzontalmente all'interno della cornice</p>
+    </div>
+
+    <script>
+        const state = {
+            projectName: '',
+            imgObj: null,
+            originalDataUrl: null, // Memorizza l'immagine in Base64
+            baseScale: 1,
+            scale: 1,
+            x: 0,
+            y: 0,
+            maxPossibleFrames: 1,
+            excludedFrames: 0,
+            finalFramesCount: 1,
+            isRestoring: false, // Flag di sicurezza per l'importazione
+            viewportHeight: window.innerWidth < 768 ? 350 : 500,
+            get frameWidth() { return this.viewportHeight * (4/5); } 
+        };
+
+        window.addEventListener('resize', () => {
+            state.viewportHeight = window.innerWidth < 768 ? 350 : 500;
+            if(state.imgObj) {
+                // Se c'è un'immagine, ricalcoliamo la griglia al ridimensionamento
+                state.isRestoring = true; 
+                restoreEditorUI();
+            }
+        });
+
+        // Helper pulsanti
+        async function withButtonState(btn, activeText, workFn) {
+            const originalText = btn.innerHTML;
+            btn.innerHTML = activeText;
+            btn.disabled = true;
+            try {
+                await workFn();
+                btn.innerHTML = "Fatto!";
+                // Mantieni o rimuovi classi in base al tipo di bottone
+                const isPrimary = btn.classList.contains('btn-primary');
+                if(isPrimary) btn.classList.remove('btn-primary');
+                else btn.classList.remove('btn-secondary');
+                
+                btn.classList.add('bg-green-600', 'text-white', 'border-green-600');
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.classList.remove('bg-green-600', 'text-white', 'border-green-600');
+                    if(isPrimary) btn.classList.add('btn-primary');
+                    else btn.classList.add('btn-secondary');
+                }, 2000);
+            } catch (err) {
+                console.error(err);
+                btn.innerHTML = "Errore!";
+                btn.classList.add('bg-red-600', 'text-white', 'border-red-600');
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.classList.remove('bg-red-600', 'text-white', 'border-red-600');
+                }, 3000);
+            }
+        }
+
+        // Funzione Reset App
+        function resetApp() {
+            if(confirm("Sei sicuro di voler ricominciare? Tutti i dati non esportati in JSON andranno persi.")) {
+                window.location.reload();
+            }
+        }
+
+        // Setup Iniziale
+        function startProject(btn) {
+            const input = document.getElementById('project-name');
+            const name = input.value.trim();
+            if (!name) {
+                alert("Inserisci un nome per il progetto per proseguire.");
+                return;
+            }
+            state.projectName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            document.getElementById('display-project-name').innerText = "Progetto: " + state.projectName;
+            
+            document.getElementById('section-setup').classList.add('hidden');
+            document.getElementById('section-upload').classList.remove('hidden');
+        }
+
+        // Caricamento Immagine
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                state.originalDataUrl = e.target.result; // Salviamo la Base64 per l'export
+                const img = new Image();
+                img.onload = () => {
+                    state.imgObj = img;
+                    initEditor();
+                };
+                img.src = state.originalDataUrl;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Importazione JSON
+        function handleImportJSON(event) {
+            const file = event.target.files[0];
+            if(!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if(!data.originalDataUrl || !data.projectName) {
+                        throw new Error("File JSON non valido o corrotto.");
+                    }
+
+                    // Popoliamo lo State
+                    state.projectName = data.projectName;
+                    state.originalDataUrl = data.originalDataUrl;
+                    state.scale = data.scale;
+                    state.x = data.x;
+                    state.y = data.y;
+                    state.excludedFrames = data.excludedFrames || 0;
+                    
+                    state.isRestoring = true; // Segnaliamo al motore di usare i dati importati
+
+                    // Ricostruiamo l'immagine
+                    const img = new Image();
+                    img.onload = () => {
+                        state.imgObj = img;
+                        restoreEditorUI();
+                    };
+                    img.src = state.originalDataUrl;
+
+                } catch(err) {
+                    alert("Errore nel caricamento del file JSON: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Inizializza Editor da zero
+        function initEditor() {
+            document.getElementById('section-upload').classList.add('hidden');
+            document.getElementById('section-editor').classList.remove('hidden');
+            document.getElementById('section-editor').classList.add('flex');
+
+            document.getElementById('preview-img').src = state.imgObj.src;
+
+            state.baseScale = state.viewportHeight / state.imgObj.naturalHeight;
+            state.scale = state.baseScale;
+            state.x = 0;
+            state.y = 0;
+            state.excludedFrames = 0; 
+            
+            const scaleSlider = document.getElementById('slider-scale');
+            scaleSlider.min = state.baseScale;
+            scaleSlider.max = Math.max(1.5, state.baseScale * 5); 
+            scaleSlider.value = state.baseScale;
+
+            document.getElementById('slider-exclude').value = 0;
+
+            updateEditorState();
+        }
+
+        // Inizializza Editor da JSON importato
+        function restoreEditorUI() {
+            document.getElementById('section-setup').classList.add('hidden');
+            document.getElementById('section-upload').classList.add('hidden');
+            document.getElementById('section-editor').classList.remove('hidden');
+            document.getElementById('section-editor').classList.add('flex');
+
+            document.getElementById('display-project-name').innerText = "Progetto: " + state.projectName;
+            document.getElementById('preview-img').src = state.imgObj.src;
+
+            state.baseScale = state.viewportHeight / state.imgObj.naturalHeight;
+            
+            const scaleSlider = document.getElementById('slider-scale');
+            scaleSlider.min = state.baseScale;
+            scaleSlider.max = Math.max(1.5, state.baseScale * 5);
+            scaleSlider.value = state.scale; // Usiamo lo scale importato
+
+            document.getElementById('slider-exclude').value = state.excludedFrames;
+
+            updateEditorState();
+        }
+
+        // Motore logico UI e Tagli
+        function updateEditorState() {
+            if (!state.imgObj) return;
+
+            state.scale = parseFloat(document.getElementById('slider-scale').value);
+            
+            const scaledW = state.imgObj.naturalWidth * state.scale;
+            const scaledH = state.imgObj.naturalHeight * state.scale;
+
+            let maxFrames = Math.floor(scaledW / state.frameWidth);
+            if (maxFrames < 1) maxFrames = 1;
+            if (maxFrames > 10) maxFrames = 10;
+            state.maxPossibleFrames = maxFrames;
+
+            const excludeSlider = document.getElementById('slider-exclude');
+            
+            if (maxFrames >= 2) {
+                excludeSlider.disabled = false;
+                let maxExcludable = maxFrames - 1;
+                excludeSlider.max = maxExcludable;
+                
+                if (parseInt(excludeSlider.value) > maxExcludable) {
+                    excludeSlider.value = maxExcludable;
+                }
+            } else {
+                excludeSlider.max = 0;
+                excludeSlider.value = 0;
+                excludeSlider.disabled = true;
+            }
+            
+            state.excludedFrames = parseInt(excludeSlider.value) || 0;
+            document.getElementById('exclude-value').innerText = state.excludedFrames;
+
+            state.finalFramesCount = state.maxPossibleFrames - state.excludedFrames;
+            const totalActiveWidth = state.finalFramesCount * state.frameWidth;
+
+            let minX = totalActiveWidth - scaledW;
+            if (minX > 0) minX = 0;
+            const sliderX = document.getElementById('slider-x');
+            sliderX.min = minX;
+            sliderX.max = 0;
+            
+            let minY = state.viewportHeight - scaledH;
+            if (minY > 0) minY = 0;
+            const sliderY = document.getElementById('slider-y');
+            sliderY.min = minY;
+            sliderY.max = 0;
+
+            // Se stiamo ripristinando un JSON, imponiamo le coordinate importate agli slider
+            if (state.isRestoring) {
+                sliderX.value = state.x;
+                sliderY.value = state.y;
+                state.isRestoring = false; // Ripristino completato, liberiamo il flag
+            }
+
+            state.x = Math.max(minX, Math.min(0, parseFloat(sliderX.value) || 0));
+            state.y = Math.max(minY, Math.min(0, parseFloat(sliderY.value) || 0));
+            sliderX.value = state.x;
+            sliderY.value = state.y;
+
+            const imgEl = document.getElementById('preview-img');
+            imgEl.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+
+            const gridContainer = document.getElementById('grid-container');
+            const cropArea = document.getElementById('crop-area');
+            
+            cropArea.style.width = `${totalActiveWidth}px`;
+            gridContainer.innerHTML = ''; 
+
+            for(let i = 0; i < state.finalFramesCount; i++) {
+                const frame = document.createElement('div');
+                frame.style.width = `${state.frameWidth}px`;
+                frame.style.height = `${state.viewportHeight}px`;
+                
+                let borderClass = 'border-2 border-brand-yellow';
+                if (i > 0) borderClass += ' border-l-2 border-dashed border-l-brand-yellow/70';
+                
+                frame.className = `${borderClass} flex items-center justify-center bg-black/5 flex-shrink-0 relative`;
+                
+                const label = document.createElement('span');
+                label.className = 'absolute bottom-3 left-3 bg-brand-yellow text-brand-blue font-bold text-lg px-3 py-1';
+                label.innerText = i + 1;
+                
+                frame.appendChild(label);
+                gridContainer.appendChild(frame);
+            }
+        }
+
+        // Estrazione Base
+        async function extractFramesAsBlobs() {
+            const blobs = [];
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const targetW = 1080;
+            const targetH = 1350;
+            canvas.width = targetW;
+            canvas.height = targetH;
+
+            for (let i = 0; i < state.finalFramesCount; i++) {
+                ctx.clearRect(0, 0, targetW, targetH);
+                ctx.fillStyle = "white"; 
+                ctx.fillRect(0, 0, targetW, targetH);
+
+                const framePreviewX = i * state.frameWidth;
+                
+                const sourceX = (framePreviewX - state.x) / state.scale;
+                const sourceY = Math.abs(state.y) / state.scale;
+                const sourceW = state.frameWidth / state.scale;
+                const sourceH = state.viewportHeight / state.scale;
+
+                ctx.drawImage(
+                    state.imgObj,
+                    sourceX, sourceY, sourceW, sourceH, 
+                    0, 0, targetW, targetH               
+                );
+
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+                blobs.push(blob);
+            }
+            return blobs;
+        }
+
+        // Export Immagini (ZIP)
+        function exportCarousel(btn) {
+            withButtonState(btn, "ZIP...", async () => {
+                const blobs = await extractFramesAsBlobs();
+                const zip = new JSZip();
+                
+                blobs.forEach((blob, index) => {
+                    const num = String(index + 1).padStart(2, '0');
+                    const filename = `${state.projectName}_${num}.jpg`;
+                    zip.file(filename, blob);
+                });
+
+                const zipBlob = await zip.generateAsync({type: "blob"});
+                
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = `${state.projectName}_carousel.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            });
+        }
+
+        // Export Progetto (JSON)
+        function exportProjectJSON(btn) {
+            withButtonState(btn, "Salvataggio...", async () => {
+                const projectData = {
+                    projectName: state.projectName,
+                    originalDataUrl: state.originalDataUrl,
+                    scale: state.scale,
+                    x: state.x,
+                    y: state.y,
+                    excludedFrames: state.excludedFrames
+                };
+
+                const jsonString = JSON.stringify(projectData);
+                const blob = new Blob([jsonString], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${state.projectName}_backup.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // Playground
+        function openPlayground(btn) {
+            withButtonState(btn, "Caricamento...", async () => {
+                const container = document.getElementById('playground-container');
+                container.innerHTML = ''; 
+                container.scrollLeft = 0; 
+                
+                const blobs = await extractFramesAsBlobs();
+                
+                for (const blob of blobs) {
+                    const url = URL.createObjectURL(blob);
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.className = "snap-item flex-none"; 
+                    container.appendChild(img);
+                }
+
+                document.getElementById('modal-playground').classList.remove('hidden');
+                document.getElementById('modal-playground').classList.add('flex');
+                document.body.style.overflow = 'hidden'; 
+            });
+        }
+
+        function closePlayground() {
+            document.getElementById('modal-playground').classList.add('hidden');
+            document.getElementById('modal-playground').classList.remove('flex');
+            document.body.style.overflow = ''; 
+            
+            const container = document.getElementById('playground-container');
+            const imgs = container.getElementsByTagName('img');
+            for(let img of imgs) {
+                URL.revokeObjectURL(img.src);
+            }
+            container.innerHTML = '';
+        }
+    </script>
+</body>
+</html>
