@@ -176,7 +176,7 @@
                     
                     <div>
                         <label class="block text-[11px] font-bold text-brand-blue mb-1 uppercase tracking-wider">Contenuto Testo</label>
-                                                <textarea id="text-content-input" class="w-full border-2 border-brand-yellow p-2 text-sm bg-white rounded-md resize-y" rows="2" oninput="updateSelectedText(this.value)" onselect="storeSidebarTextSelection()" onkeyup="storeSidebarTextSelection()" onmouseup="storeSidebarTextSelection()"></textarea>
+                                                                        <div id="text-content-input" contenteditable="true" class="w-full min-h-[72px] border-2 border-brand-yellow p-2 text-sm bg-white rounded-md outline-none whitespace-pre-wrap break-words" oninput="updateSelectedText(this.innerText)" onkeyup="storeSidebarTextSelection()" onmouseup="storeSidebarTextSelection()" onblur="storeSidebarTextSelection()"></div>
                         <p class="text-[9px] text-gray-500 leading-tight mt-1">Seleziona qui una o più parole e applica colore, grassetto o corsivo dai controlli sotto.</p>
                     </div>
 
@@ -784,15 +784,84 @@
             obj.setCoords();
         }
 
-                let sidebarTextSelection = { start: 0, end: 0 };
+                        let sidebarTextSelection = { start: 0, end: 0 };
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function getEditableSelectionRange(el) {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return sidebarTextSelection;
+
+            const range = selection.getRangeAt(0);
+            if (!el.contains(range.startContainer) || !el.contains(range.endContainer)) return sidebarTextSelection;
+
+            const preRange = range.cloneRange();
+            preRange.selectNodeContents(el);
+            preRange.setEnd(range.startContainer, range.startOffset);
+
+            const selectedRange = range.cloneRange();
+
+            return {
+                start: preRange.toString().length,
+                end: preRange.toString().length + selectedRange.toString().length
+            };
+        }
 
         window.storeSidebarTextSelection = function() {
             const input = document.getElementById('text-content-input');
             if (!input) return;
-            sidebarTextSelection = {
-                start: input.selectionStart || 0,
-                end: input.selectionEnd || 0
-            };
+            sidebarTextSelection = getEditableSelectionRange(input);
+        };
+
+        function getTextboxStyleAt(obj, absoluteIndex) {
+            const lines = (obj.text || '').split('\n');
+            let cursor = 0;
+
+            for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+                const lineLength = lines[lineIndex].length;
+
+                if (absoluteIndex >= cursor && absoluteIndex < cursor + lineLength) {
+                    const charIndex = absoluteIndex - cursor;
+                    return (obj.styles && obj.styles[lineIndex] && obj.styles[lineIndex][charIndex]) || {};
+                }
+
+                cursor += lineLength + 1;
+            }
+
+            return {};
+        }
+
+        function renderSidebarTextEditor(obj) {
+            const input = document.getElementById('text-content-input');
+            if (!input || !obj) return;
+
+            const text = obj.text || '';
+            let html = '';
+
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+
+                if (char === '\n') {
+                    html += '<br>';
+                    continue;
+                }
+
+                const style = getTextboxStyleAt(obj, i);
+                const color = style.fill || obj.fill || '#000000';
+                const weight = style.fontWeight || obj.fontWeight || 'normal';
+                const fontStyle = style.fontStyle || obj.fontStyle || 'normal';
+
+                html += `<span style="color:${color};font-weight:${weight};font-style:${fontStyle};">${escapeHtml(char)}</span>`;
+            }
+
+            input.innerHTML = html || '<br>';
         };
 
         function getCleanRange(text, start, end) {
@@ -869,7 +938,7 @@
                 document.getElementById('text-controls').classList.remove('hidden');
                 document.getElementById('text-controls').classList.add('flex');
                 
-                document.getElementById('text-content-input').value = obj.text || '';
+                                renderSidebarTextEditor(obj);
 
                                 document.getElementById('font-family').value = obj.fontFamily || 'Inter';
                 document.getElementById('rng-fontsize').value = obj.fontSize || 24;
@@ -894,14 +963,16 @@
             }
         }
 
-        window.updateSelectedText = function(newText) {
+                window.updateSelectedText = function(newText) {
             const obj = fCanvas.getActiveObject();
-            if (obj && obj.type === 'textbox') { 
+            if (obj && obj.type === 'textbox') {
+                newText = newText.replace(/\n$/, '');
                 obj.set('text', newText);
                 obj.dirty = true;
                 if (!obj.isEditing) obj.initDimensions();
                 obj.setCoords();
                 configureTextboxObject(obj);
+                storeSidebarTextSelection();
                 fCanvas.requestRenderAll(); 
                 debouncedSyncPreview(); 
             }
