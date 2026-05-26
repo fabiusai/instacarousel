@@ -176,8 +176,8 @@
                     
                     <div>
                         <label class="block text-[11px] font-bold text-brand-blue mb-1 uppercase tracking-wider">Contenuto Testo</label>
-                        <textarea id="text-content-input" class="w-full border-2 border-brand-yellow p-2 text-sm bg-white rounded-md resize-y" rows="2" oninput="updateSelectedText(this.value)"></textarea>
-                        <p class="text-[9px] text-gray-500 leading-tight mt-1">Modifica qui il testo base. Per formattare <b>singole parole</b>, fai doppio clic sul testo nell'immagine e usa i controlli sotto.</p>
+                                                <textarea id="text-content-input" class="w-full border-2 border-brand-yellow p-2 text-sm bg-white rounded-md resize-y" rows="2" oninput="updateSelectedText(this.value)" onselect="storeSidebarTextSelection()" onkeyup="storeSidebarTextSelection()" onmouseup="storeSidebarTextSelection()"></textarea>
+                        <p class="text-[9px] text-gray-500 leading-tight mt-1">Seleziona qui una o più parole e applica colore, grassetto o corsivo dai controlli sotto.</p>
                     </div>
 
                                         <div>
@@ -784,26 +784,45 @@
             obj.setCoords();
         }
 
-        function getCleanTextSelection(obj) {
-            let start = obj.selectionStart;
-            let end = obj.selectionEnd;
-            const text = obj.text || '';
+                let sidebarTextSelection = { start: 0, end: 0 };
 
+        window.storeSidebarTextSelection = function() {
+            const input = document.getElementById('text-content-input');
+            if (!input) return;
+            sidebarTextSelection = {
+                start: input.selectionStart || 0,
+                end: input.selectionEnd || 0
+            };
+        };
+
+        function getCleanRange(text, start, end) {
             while (start < end && /\s/.test(text[start])) start++;
             while (end > start && /\s/.test(text[end - 1])) end--;
-
             return { start, end };
         }
 
-        function applySelectedTextboxStyle(obj, styleObj) {
-            if (obj.isEditing && obj.selectionStart !== obj.selectionEnd) {
-                const cleanSelection = getCleanTextSelection(obj);
+        function getActiveTextStyleRange(obj) {
+            const input = document.getElementById('text-content-input');
+            const text = obj.text || '';
 
-                if (cleanSelection.start !== cleanSelection.end) {
-                    obj.selectionStart = cleanSelection.start;
-                    obj.selectionEnd = cleanSelection.end;
-                    obj.setSelectionStyles(styleObj, cleanSelection.start, cleanSelection.end);
-                }
+            if (input && sidebarTextSelection.end > sidebarTextSelection.start) {
+                return getCleanRange(text, sidebarTextSelection.start, sidebarTextSelection.end);
+            }
+
+            if (obj.isEditing && obj.selectionStart !== obj.selectionEnd) {
+                return getCleanRange(text, obj.selectionStart, obj.selectionEnd);
+            }
+
+            return null;
+        }
+
+        function applySelectedTextboxStyle(obj, styleObj) {
+            const range = getActiveTextStyleRange(obj);
+
+            if (range && range.start !== range.end) {
+                obj.setSelectionStyles(styleObj, range.start, range.end);
+                obj.selectionStart = range.start;
+                obj.selectionEnd = range.end;
             } else {
                 obj.set(styleObj);
             }
@@ -901,8 +920,9 @@
         window.toggleTextWeight = function() {
             const obj = fCanvas.getActiveObject();
             if(obj && obj.type === 'textbox') { 
-                const selectionStyle = obj.isEditing && obj.selectionStart !== obj.selectionEnd
-                    ? obj.getSelectionStyles(obj.selectionStart, obj.selectionStart + 1)[0] || {}
+                                const range = getActiveTextStyleRange(obj);
+                const selectionStyle = range
+                    ? obj.getSelectionStyles(range.start, range.start + 1)[0] || {}
                     : {};
                 const currentWeight = selectionStyle.fontWeight || obj.fontWeight;
                 const newVal = currentWeight === 'bold' ? 'normal' : 'bold';
@@ -913,8 +933,9 @@
         window.toggleTextItalic = function() {
             const obj = fCanvas.getActiveObject();
             if(obj && obj.type === 'textbox') { 
-                const selectionStyle = obj.isEditing && obj.selectionStart !== obj.selectionEnd
-                    ? obj.getSelectionStyles(obj.selectionStart, obj.selectionStart + 1)[0] || {}
+                                const range = getActiveTextStyleRange(obj);
+                const selectionStyle = range
+                    ? obj.getSelectionStyles(range.start, range.start + 1)[0] || {}
                     : {};
                 const currentStyle = selectionStyle.fontStyle || obj.fontStyle;
                 const newVal = currentStyle === 'italic' ? 'normal' : 'italic';
