@@ -224,11 +224,14 @@
                         <button class="btn-secondary w-full" onclick="openPlayground(this)">Testa Carousel</button>
                         
                         <div class="grid grid-cols-2 gap-2">
-                            <button class="btn-secondary text-xs px-1 col-span-1 flex justify-center items-center gap-1" onclick="exportProjectJSON(this)">
-                                Salva JSON
+                            <button class="btn-primary text-[11px] px-1 py-3 col-span-1 flex justify-center items-center text-center" onclick="exportIndividualFrames(this)">
+                                Singoli File
                             </button>
-                            <button class="btn-primary text-xs px-1 col-span-1 flex justify-center items-center gap-1" onclick="exportCarousel(this)">
-                                Esporta ZIP
+                            <button class="btn-primary text-[11px] px-1 py-3 col-span-1 flex justify-center items-center text-center" onclick="exportCarousel(this)">
+                                File .ZIP
+                            </button>
+                            <button class="btn-secondary text-[11px] px-1 col-span-2 flex justify-center items-center" onclick="exportProjectJSON(this)">
+                                Salva Backup JSON
                             </button>
                         </div>
 
@@ -293,13 +296,14 @@
         // Helper pulsanti
         async function withButtonState(btn, activeText, workFn) {
             const originalText = btn.innerHTML;
+            const isPrimary = btn.classList.contains('btn-primary');
+            
             btn.innerHTML = activeText;
             btn.disabled = true;
             try {
                 await workFn();
                 btn.innerHTML = "Fatto!";
-                // Mantieni o rimuovi classi in base al tipo di bottone
-                const isPrimary = btn.classList.contains('btn-primary');
+                
                 if(isPrimary) btn.classList.remove('btn-primary');
                 else btn.classList.remove('btn-secondary');
                 
@@ -570,6 +574,31 @@
                 blobs.push(blob);
             }
             return blobs;
+        }
+
+        // Export Singoli File
+        function exportIndividualFrames(btn) {
+            withButtonState(btn, "Export...", async () => {
+                const blobs = await extractFramesAsBlobs();
+                
+                for (let i = 0; i < blobs.length; i++) {
+                    const blob = blobs[i];
+                    const num = String(i + 1).padStart(2, '0');
+                    const filename = `${state.projectName}_${num}.jpg`;
+                    const url = URL.createObjectURL(blob);
+                    
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    // Ritardo strategico per evitare che il browser blocchi i download multipli simultanei
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    URL.revokeObjectURL(url);
+                }
+            });
         }
 
         // Export Immagini (ZIP)
