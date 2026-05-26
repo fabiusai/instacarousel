@@ -180,7 +180,7 @@
                         <p class="text-[9px] text-gray-500 leading-tight mt-1">Modifica qui il testo base. Per formattare <b>singole parole</b>, fai doppio clic sul testo nell'immagine e usa i controlli sotto.</p>
                     </div>
 
-                    <div>
+                                        <div>
                         <label class="block text-[11px] font-bold text-gray-600 mb-1">Font Family</label>
                         <select id="font-family" class="w-full border border-gray-300 p-1.5 text-sm bg-white" onchange="updateSelectedObject('fontFamily', this.value)">
                             <option value="Inter">Inter (Default)</option>
@@ -189,6 +189,13 @@
                             <option value="Arial">Arial</option>
                             <option value="Times New Roman">Times New Roman</option>
                         </select>
+                    </div>
+
+                    <div class="bg-gray-100 p-2 border border-gray-200 rounded">
+                        <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                            <span>Dimensione Font</span> <span id="val-fontsize">24</span>
+                        </label>
+                        <input type="range" id="rng-fontsize" min="8" max="96" step="1" value="24" oninput="updateTextMetric('fontSize', this.value)">
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -740,10 +747,79 @@
             document.getElementById('modal-editor').classList.remove('flex');
         };
 
+                        function configureTextboxObject(obj) {
+            if (!obj || obj.type !== 'textbox') return;
+
+            obj.set({
+                lockUniScaling: false,
+                lockScalingY: true,
+                lockScalingFlip: true,
+                centeredScaling: false
+            });
+
+            obj.setControlsVisibility({
+                tl: false,
+                tr: false,
+                bl: false,
+                br: false,
+                mt: false,
+                mb: false,
+                ml: true,
+                mr: true,
+                mtr: true
+            });
+
+            if (obj.scaleX && obj.scaleX !== 1) {
+                obj.set({
+                    width: Math.max(40, obj.width * obj.scaleX),
+                    scaleX: 1
+                });
+            }
+
+            obj.set({
+                scaleY: 1
+            });
+
+            obj.initDimensions();
+            obj.setCoords();
+        }
+
+        function getCleanTextSelection(obj) {
+            let start = obj.selectionStart;
+            let end = obj.selectionEnd;
+            const text = obj.text || '';
+
+            while (start < end && /\s/.test(text[start])) start++;
+            while (end > start && /\s/.test(text[end - 1])) end--;
+
+            return { start, end };
+        }
+
+        function applySelectedTextboxStyle(obj, styleObj) {
+            if (obj.isEditing && obj.selectionStart !== obj.selectionEnd) {
+                const cleanSelection = getCleanTextSelection(obj);
+
+                if (cleanSelection.start !== cleanSelection.end) {
+                    obj.selectionStart = cleanSelection.start;
+                    obj.selectionEnd = cleanSelection.end;
+                    obj.setSelectionStyles(styleObj, cleanSelection.start, cleanSelection.end);
+                }
+            } else {
+                obj.set(styleObj);
+            }
+
+            obj.dirty = true;
+            if (!obj.isEditing) obj.initDimensions();
+            obj.setCoords();
+            fCanvas.requestRenderAll();
+            debouncedSyncPreview();
+        }
+
         window.addPreset = function(type) {
             // Nota: editable è tornato TRUE per consentire stile granulare
             let options = {
-                left: 50, top: 50, width: 300, fontFamily: 'Montserrat', textAlign: 'center', editable: true
+                left: 50, top: 50, width: 300, fontFamily: 'Montserrat', textAlign: 'center', editable: true,
+                lockUniScaling: true, lockScalingFlip: true
             };
 
             if (type === 'title') {
@@ -755,6 +831,7 @@
             }
 
             const text = new fabric.Textbox(options.text, options);
+            configureTextboxObject(text);
             fCanvas.add(text); fCanvas.centerObject(text); fCanvas.setActiveObject(text);
             syncPreview();
         };
@@ -768,12 +845,16 @@
         function syncUIControls() { 
             const obj = fCanvas.getActiveObject();
             if(obj && obj.type === 'textbox') {
+                configureTextboxObject(obj);
+
                 document.getElementById('text-controls').classList.remove('hidden');
                 document.getElementById('text-controls').classList.add('flex');
                 
                 document.getElementById('text-content-input').value = obj.text || '';
 
-                document.getElementById('font-family').value = obj.fontFamily || 'Inter';
+                                document.getElementById('font-family').value = obj.fontFamily || 'Inter';
+                document.getElementById('rng-fontsize').value = obj.fontSize || 24;
+                document.getElementById('val-fontsize').innerText = obj.fontSize || 24;
                 document.getElementById('text-color').value = obj.fill || '#000000';
                 document.getElementById('bg-color').value = obj.backgroundColor || '#ffffff';
                 
@@ -798,8 +879,10 @@
             const obj = fCanvas.getActiveObject();
             if (obj && obj.type === 'textbox') { 
                 obj.set('text', newText);
-                obj.initDimensions();
+                obj.dirty = true;
+                if (!obj.isEditing) obj.initDimensions();
                 obj.setCoords();
+                configureTextboxObject(obj);
                 fCanvas.requestRenderAll(); 
                 debouncedSyncPreview(); 
             }
@@ -809,57 +892,33 @@
         window.updateSelectedObject = function(property, value) {
             const obj = fCanvas.getActiveObject();
             if (obj && obj.type === 'textbox') { 
-                // Se l'utente sta modificando e ha evidenziato del testo
-                if (obj.isEditing && obj.selectionStart !== obj.selectionEnd) {
-                    let styleObj = {};
-                    styleObj[property] = value;
-                    obj.setSelectionStyles(styleObj);
-                } else {
-                    obj.set(property, value); 
-                }
-                obj.dirty = true;
-                obj.initDimensions();
-                obj.setCoords();
-                fCanvas.requestRenderAll(); 
-                debouncedSyncPreview(); 
+                let styleObj = {};
+                styleObj[property] = value;
+                applySelectedTextboxStyle(obj, styleObj);
             }
         };
 
         window.toggleTextWeight = function() {
             const obj = fCanvas.getActiveObject();
             if(obj && obj.type === 'textbox') { 
-                const isBold = obj.fontWeight === 'bold';
-                const newVal = isBold ? 'normal' : 'bold';
-                
-                if (obj.isEditing && obj.selectionStart !== obj.selectionEnd) {
-                    obj.setSelectionStyles({ fontWeight: newVal });
-                } else {
-                    obj.set('fontWeight', newVal); 
-                }
-                obj.dirty = true;
-                obj.initDimensions();
-                obj.setCoords();
-                fCanvas.requestRenderAll(); 
-                debouncedSyncPreview(); 
+                const selectionStyle = obj.isEditing && obj.selectionStart !== obj.selectionEnd
+                    ? obj.getSelectionStyles(obj.selectionStart, obj.selectionStart + 1)[0] || {}
+                    : {};
+                const currentWeight = selectionStyle.fontWeight || obj.fontWeight;
+                const newVal = currentWeight === 'bold' ? 'normal' : 'bold';
+                applySelectedTextboxStyle(obj, { fontWeight: newVal });
             }
         };
 
         window.toggleTextItalic = function() {
             const obj = fCanvas.getActiveObject();
             if(obj && obj.type === 'textbox') { 
-                const isItalic = obj.fontStyle === 'italic';
-                const newVal = isItalic ? 'normal' : 'italic';
-
-                if (obj.isEditing && obj.selectionStart !== obj.selectionEnd) {
-                    obj.setSelectionStyles({ fontStyle: newVal });
-                } else {
-                    obj.set('fontStyle', newVal); 
-                }
-                obj.dirty = true;
-                obj.initDimensions();
-                obj.setCoords();
-                fCanvas.requestRenderAll(); 
-                debouncedSyncPreview(); 
+                const selectionStyle = obj.isEditing && obj.selectionStart !== obj.selectionEnd
+                    ? obj.getSelectionStyles(obj.selectionStart, obj.selectionStart + 1)[0] || {}
+                    : {};
+                const currentStyle = selectionStyle.fontStyle || obj.fontStyle;
+                const newVal = currentStyle === 'italic' ? 'normal' : 'italic';
+                applySelectedTextboxStyle(obj, { fontStyle: newVal });
             }
         };
 
@@ -872,7 +931,8 @@
                 if(property === 'lineHeight') document.getElementById('val-lineheight').innerText = numVal;
                 if(property === 'customBgPadding') document.getElementById('val-padding').innerText = numVal;
                 if(property === 'customBgRadius') document.getElementById('val-radius').innerText = numVal;
-                if(property === 'customBarWidth') document.getElementById('val-barwidth').innerText = numVal;
+                                if(property === 'customBarWidth') document.getElementById('val-barwidth').innerText = numVal;
+                if(property === 'fontSize') document.getElementById('val-fontsize').innerText = numVal;
                 
                 obj.dirty = true;
                 obj.initDimensions();
