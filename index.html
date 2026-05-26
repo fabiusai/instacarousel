@@ -7,9 +7,14 @@
     
     <link rel="icon" href="favicon.ico">
     
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Montserrat:ital,wght@0,400;0,600;0,800;1,400&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -24,7 +29,9 @@
                         }
                     },
                     fontFamily: {
-                        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                        montserrat: ['Montserrat', 'sans-serif'],
+                        nunito: ['Nunito', 'sans-serif']
                     }
                 }
             }
@@ -32,117 +39,22 @@
     </script>
 
     <style>
-        /* Stili Flat per gli Input Range (Sliders) */
-        input[type=range] {
-            -webkit-appearance: none;
-            width: 100%;
-            background: transparent;
-        }
-        input[type=range]:focus {
-            outline: none;
-        }
-        input[type=range]:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 20px;
-            width: 20px;
-            background: #0146bc;
-            cursor: pointer;
-            border: none;
-            border-radius: 0;
-            margin-top: -7px;
-        }
-        input[type=range]:disabled::-webkit-slider-thumb {
-            background: #94a3b8;
-            cursor: not-allowed;
-        }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 6px;
-            cursor: pointer;
-            background: #cbd5e1;
-            border-radius: 0;
-        }
-        input[type=range]::-moz-range-thumb {
-            height: 20px;
-            width: 20px;
-            background: #0146bc;
-            cursor: pointer;
-            border: none;
-            border-radius: 0;
-        }
-        input[type=range]:disabled::-moz-range-thumb {
-            background: #94a3b8;
-            cursor: not-allowed;
-        }
-        input[type=range]::-moz-range-track {
-            width: 100%;
-            height: 6px;
-            cursor: pointer;
-            background: #cbd5e1;
-            border-radius: 0;
-        }
-
-        /* Playground Scroll-Snap */
-        .snap-container {
-            scroll-snap-type: x mandatory;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-        }
-        .snap-container::-webkit-scrollbar {
-            display: none;
-        }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; background: #0146bc; cursor: pointer; border-radius: 50%; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #cbd5e1; border-radius: 2px; }
         
-        .snap-item {
-            scroll-snap-align: center;
-            flex-shrink: 0;
-            height: 100% !important;
-            width: auto !important;
-            object-fit: contain;
-        }
+        .snap-container { scroll-snap-type: x mandatory; overflow-x: auto; scrollbar-width: none; }
+        .snap-container::-webkit-scrollbar { display: none; }
+        .snap-item { scroll-snap-align: center; flex-shrink: 0; height: 100% !important; width: auto !important; object-fit: contain; }
 
-        /* Bottoni Flat */
-        .btn-primary {
-            background-color: #0146bc;
-            color: white;
-            border: 2px solid #0146bc;
-            border-radius: 0;
-            padding: 0.5rem 1.5rem;
-            text-transform: uppercase;
-            font-weight: 600;
-            font-size: 0.875rem;
-            letter-spacing: 0.05em;
-            transition: background-color 0.2s;
-        }
-        .btn-primary:hover:not(:disabled) {
-            background-color: #013896;
-            border-color: #013896;
-        }
-        .btn-primary:disabled {
-            background-color: #94a3b8;
-            border-color: #94a3b8;
-            cursor: not-allowed;
-        }
+        .btn-primary { background-color: #0146bc; color: white; border: 2px solid #0146bc; padding: 0.5rem 1.5rem; text-transform: uppercase; font-weight: 600; font-size: 0.875rem; transition: background-color 0.2s; }
+        .btn-primary:hover { background-color: #013896; }
+        .btn-secondary { background-color: transparent; color: #0146bc; border: 2px solid #0146bc; padding: 0.5rem 1.5rem; text-transform: uppercase; font-weight: 600; font-size: 0.875rem; transition: background-color 0.2s; }
+        .btn-secondary:hover { background-color: #f8fafc; }
         
-        .btn-secondary {
-            background-color: transparent;
-            color: #0146bc;
-            border: 2px solid #0146bc;
-            border-radius: 0;
-            padding: 0.5rem 1.5rem;
-            text-transform: uppercase;
-            font-weight: 600;
-            font-size: 0.875rem;
-            letter-spacing: 0.05em;
-            transition: background-color 0.2s;
-        }
-        .btn-secondary:hover:not(:disabled) {
-            background-color: #f8fafc;
-        }
+        /* Nascondiamo i controlli di resizing standard per un look più pulito */
+        .canvas-container { margin: 0 auto; }
     </style>
 </head>
 <body class="bg-white text-gray-800 antialiased min-h-screen flex flex-col">
@@ -155,19 +67,16 @@
 
     <main class="flex-grow flex flex-col max-w-6xl mx-auto w-full p-4 md:p-8">
         
-        <section id="section-setup" class="mb-12 max-w-lg border border-gray-200 p-6 bg-brand-gray">
+        <section id="section-setup" class="mb-12 max-w-lg border border-gray-200 p-6 bg-brand-gray shadow-sm">
             <h2 class="text-xl font-bold text-brand-blue mb-4 uppercase">1. Configurazione Progetto</h2>
             <div class="flex flex-col gap-4">
                 <div>
                     <label class="text-sm font-semibold text-gray-600 block mb-1">Nuovo Progetto (inserisci nome)</label>
-                    <input type="text" id="project-name" placeholder="Es. Campagna_Autunno" class="w-full border-2 border-gray-300 p-3 outline-none focus:border-brand-blue transition-colors rounded-none">
+                    <input type="text" id="project-name" placeholder="Es. Campagna_Estiva" class="w-full border-2 border-gray-300 p-3 outline-none focus:border-brand-blue transition-colors">
                 </div>
+                <button id="btn-start" class="btn-primary w-full" onclick="startProject(this)">Inizia Vuoto</button>
                 
-                <div class="flex flex-col sm:flex-row gap-3 mt-2 border-b border-gray-300 pb-6">
-                    <button id="btn-start" class="btn-primary flex-1" onclick="startProject(this)">Inizia Vuoto</button>
-                </div>
-
-                <div>
+                <div class="mt-4 border-t border-gray-300 pt-4">
                     <label class="text-sm font-semibold text-gray-600 block mb-2">Hai già un file salvato?</label>
                     <button class="btn-secondary w-full border-gray-400 text-gray-600 hover:text-brand-blue hover:border-brand-blue" onclick="document.getElementById('import-upload').click()">
                         Importa da File JSON
@@ -181,8 +90,7 @@
             <h2 class="text-xl font-bold text-brand-blue mb-4 uppercase">2. Caricamento Asset</h2>
             <div class="border-2 border-dashed border-gray-400 bg-brand-gray p-8 text-center cursor-pointer hover:border-brand-blue transition-colors" onclick="document.getElementById('file-upload').click()">
                 <svg class="w-12 h-12 mx-auto text-brand-blue mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                <span class="font-semibold text-gray-700">Seleziona un'immagine in formato landscape</span>
-                <span class="block text-sm text-gray-500 mt-1">Nessun limite di risoluzione</span>
+                <span class="font-semibold text-gray-700">Seleziona immagine orizzontale</span>
                 <input type="file" id="file-upload" class="hidden" accept="image/png, image/jpeg" onchange="handleImageUpload(event)">
             </div>
         </section>
@@ -190,24 +98,24 @@
         <section id="section-editor" class="hidden flex-col gap-8 w-full">
             <div class="border-b-2 border-gray-200 pb-4 flex justify-between items-end">
                 <div>
-                    <h2 class="text-xl font-bold text-brand-blue uppercase">3. Ritaglio e Adattamento Carousel (4:5)</h2>
+                    <h2 class="text-xl font-bold text-brand-blue uppercase">3. Ritaglio e Adattamento (4:5)</h2>
                     <p class="text-sm text-gray-500 font-medium" id="display-project-name">Progetto: -</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 <div class="lg:col-span-1 flex flex-col gap-5 bg-brand-gray p-6 border border-gray-200">
-                    <h3 class="font-bold text-brand-blue uppercase text-sm border-b border-gray-300 pb-2">Controlli Immagine</h3>
+                    <h3 class="font-bold text-brand-blue uppercase text-sm border-b border-gray-300 pb-2">Posizionamento Sfondo</h3>
                     <div>
                         <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Ingrandimento</label>
                         <input type="range" id="slider-scale" step="0.001" value="1" oninput="updateEditorState()">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Sposta Orizzontalmente</label>
+                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Sposta X</label>
                         <input type="range" id="slider-x" step="1" value="0" oninput="updateEditorState()">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Sposta Verticalmente</label>
+                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Sposta Y</label>
                         <input type="range" id="slider-y" step="1" value="0" oninput="updateEditorState()">
                     </div>
                     
@@ -217,61 +125,227 @@
                             <span id="exclude-value" class="text-brand-blue font-bold text-base bg-white px-2 py-0.5 border border-gray-300">0</span>
                         </label>
                         <input type="range" id="slider-exclude" min="0" max="0" step="1" value="0" oninput="updateEditorState()">
-                        <p class="text-[10px] text-gray-500 mt-1 uppercase">Rimuove i frame da destra</p>
                     </div>
                     
                     <div class="mt-6 pt-5 border-t-2 border-gray-300 flex flex-col gap-3">
                         <button class="btn-secondary w-full" onclick="openPlayground(this)">Testa Carousel</button>
-                        
                         <div class="grid grid-cols-2 gap-2">
-                            <button class="btn-primary text-[11px] px-1 py-3 col-span-1 flex justify-center items-center text-center" onclick="exportIndividualFrames(this)">
-                                Singoli File
-                            </button>
-                            <button class="btn-primary text-[11px] px-1 py-3 col-span-1 flex justify-center items-center text-center" onclick="exportCarousel(this)">
-                                File .ZIP
-                            </button>
-                            <button class="btn-secondary text-[11px] px-1 col-span-2 flex justify-center items-center" onclick="exportProjectJSON(this)">
-                                Salva Backup JSON
-                            </button>
+                            <button class="btn-primary text-[11px] px-1 py-3" onclick="exportCarousel(this)">File .ZIP</button>
+                            <button class="btn-secondary text-[11px] px-1 py-3" onclick="exportProjectJSON(this)">Salva JSON</button>
                         </div>
-
-                        <button class="text-red-600 font-bold uppercase text-[11px] mt-4 tracking-wider hover:underline text-center" onclick="resetApp()">
-                            Ricomincia da Capo (Reset)
-                        </button>
                     </div>
                 </div>
 
-                <div class="lg:col-span-3 overflow-x-auto bg-gray-100 border border-gray-300 pb-4">
+                <div class="lg:col-span-3 overflow-x-auto bg-gray-100 border border-gray-300 pb-4 relative">
                     <div id="crop-area" class="relative h-[350px] md:h-[500px] overflow-hidden origin-top-left" style="width: 0px;">
                         <img id="preview-img" class="absolute top-0 left-0 origin-top-left pointer-events-none max-w-none" style="width: auto; height: auto;" src="" alt="preview">
-                        <div id="grid-container" class="absolute inset-0 flex pointer-events-none">
-                            </div>
+                        <div id="grid-container" class="absolute inset-0 flex pointer-events-none"></div>
                     </div>
                 </div>
             </div>
         </section>
-
     </main>
+
+    <div id="modal-editor" class="fixed inset-0 z-50 bg-gray-900/95 hidden flex-col justify-center items-center p-4">
+        <div class="absolute top-6 right-6 flex gap-3">
+            <button class="bg-gray-100 text-brand-blue hover:bg-white border-2 border-white font-bold text-xs px-4 py-2 uppercase tracking-widest transition-colors shadow-lg" onclick="syncPreview()">↻ Aggiorna Preview</button>
+            <button class="bg-brand-yellow text-brand-blue hover:bg-white font-bold text-sm px-6 py-2 uppercase tracking-widest transition-colors shadow-lg" onclick="closeAdvancedEditor()">Salva e Chiudi</button>
+        </div>
+        
+        <div class="w-full max-w-6xl bg-white flex flex-col md:flex-row h-[85vh] rounded shadow-2xl overflow-hidden border-4 border-brand-blue">
+            
+            <div class="w-full md:w-80 bg-gray-50 border-r border-gray-300 p-5 flex flex-col gap-5 overflow-y-auto">
+                
+                <div>
+                    <h3 class="font-bold text-brand-blue uppercase text-xs border-b-2 border-gray-300 pb-2 mb-3">Modelli Preimpostati</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="border border-gray-300 bg-white p-2 text-[10px] font-bold hover:border-brand-blue" onclick="addPreset('title')">
+                            TITOLO GRANDE
+                        </button>
+                        <button class="border border-gray-300 bg-brand-blue text-white p-2 text-[10px] font-bold hover:bg-brand-bluedark rounded-md" onclick="addPreset('label')">
+                            Etichetta Stondata
+                        </button>
+                        <button class="border border-gray-300 bg-gray-100 p-2 text-[10px] font-bold italic border-l-4 border-l-brand-yellow hover:bg-gray-200 col-span-2 flex items-center justify-center gap-2" onclick="addPreset('quote')">
+                            <span class="w-1 h-4 bg-brand-yellow block"></span> "Citazione con Barra"
+                        </button>
+                    </div>
+                </div>
+
+                <div id="text-controls" class="hidden flex-col gap-4 opacity-50 transition-opacity" style="opacity: 1;">
+                    <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider bg-gray-200 p-2 border-l-4 border-brand-blue">Proprietà Testo</h4>
+                    
+                    <div>
+                        <label class="block text-[11px] font-bold text-brand-blue mb-1 uppercase tracking-wider">Contenuto Testo</label>
+                        <textarea id="text-content-input" class="w-full border-2 border-brand-yellow p-2 text-sm bg-white rounded-md resize-y" rows="2" oninput="updateSelectedText(this.value)"></textarea>
+                        <p class="text-[9px] text-gray-500 leading-tight mt-1">Modifica qui il testo base. Per formattare <b>singole parole</b>, fai doppio clic sul testo nell'immagine e usa i controlli sotto.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-600 mb-1">Font Family</label>
+                        <select id="font-family" class="w-full border border-gray-300 p-1.5 text-sm bg-white" onchange="updateSelectedObject('fontFamily', this.value)">
+                            <option value="Inter">Inter (Default)</option>
+                            <option value="Montserrat">Montserrat (Simile Avenir)</option>
+                            <option value="Nunito">Nunito (Simile Avenir Rounded)</option>
+                            <option value="Arial">Arial</option>
+                            <option value="Times New Roman">Times New Roman</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 mb-1">Colore Testo</label>
+                            <input type="color" id="text-color" value="#0146bc" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateSelectedObject('fill', this.value)">
+                            <div class="flex gap-1.5 mt-1">
+                                <button class="w-4 h-4 rounded-full bg-[#333333] border border-gray-300" onclick="applyQuickColor('#333333', 'fill', 'text-color')" title="Grigio Scuro"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#0146bc] border border-gray-300" onclick="applyQuickColor('#0146bc', 'fill', 'text-color')" title="Blu Poste"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#eddc01] border border-gray-300" onclick="applyQuickColor('#eddc01', 'fill', 'text-color')" title="Giallo Poste"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#ffffff] border border-gray-300" onclick="applyQuickColor('#ffffff', 'fill', 'text-color')" title="Bianco"></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                <span>Sfondo Testo</span>
+                                <button class="text-red-600 hover:text-red-800 underline text-[9px]" onclick="updateSelectedObject('backgroundColor', '')">Vuoto</button>
+                            </label>
+                            <input type="color" id="bg-color" value="#ffffff" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateSelectedObject('backgroundColor', this.value)">
+                            <div class="flex gap-1.5 mt-1">
+                                <button class="w-4 h-4 rounded-full bg-[#333333] border border-gray-300" onclick="applyQuickColor('#333333', 'backgroundColor', 'bg-color')"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#0146bc] border border-gray-300" onclick="applyQuickColor('#0146bc', 'backgroundColor', 'bg-color')"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#eddc01] border border-gray-300" onclick="applyQuickColor('#eddc01', 'backgroundColor', 'bg-color')"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#ffffff] border border-gray-300" onclick="applyQuickColor('#ffffff', 'backgroundColor', 'bg-color')"></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-1 mt-2">
+                        <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="updateSelectedObject('textAlign', 'left')">← Sx</button>
+                        <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="updateSelectedObject('textAlign', 'center')">↔ Ctr</button>
+                        <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="updateSelectedObject('textAlign', 'right')">Dx →</button>
+                        <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white font-bold" onclick="toggleTextWeight()">B</button>
+                        <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white italic" onclick="toggleTextItalic()">I</button>
+                    </div>
+
+                    <div class="bg-blue-50 p-2 border border-blue-200 rounded mt-2">
+                        <h5 class="text-[10px] font-bold text-brand-blue mb-2 uppercase">Barra Decorativa Laterale</h5>
+                        <div class="flex gap-2 mb-2">
+                            <select id="bar-position" class="text-xs p-1 border border-gray-300 flex-1 bg-white" onchange="updateTextMetric('customBarPosition', this.value)">
+                                <option value="none">Nessuna</option>
+                                <option value="left">Sinistra</option>
+                                <option value="right">Destra</option>
+                            </select>
+                            <input type="color" id="bar-color" value="#0146bc" class="w-8 h-6 p-0 border-0" oninput="updateTextMetric('customBarColor', this.value)">
+                        </div>
+                        <div class="flex gap-1.5 mb-2 justify-end">
+                            <button class="w-3 h-3 rounded-full bg-[#333333] border border-gray-300" onclick="applyQuickColor('#333333', 'customBarColor', 'bar-color')"></button>
+                            <button class="w-3 h-3 rounded-full bg-[#0146bc] border border-gray-300" onclick="applyQuickColor('#0146bc', 'customBarColor', 'bar-color')"></button>
+                            <button class="w-3 h-3 rounded-full bg-[#eddc01] border border-gray-300" onclick="applyQuickColor('#eddc01', 'customBarColor', 'bar-color')"></button>
+                        </div>
+                        <label class="flex justify-between text-[10px] font-bold text-gray-600 mb-1">
+                            <span>Spessore Barra</span> <span id="val-barwidth">8</span>
+                        </label>
+                        <input type="range" id="rng-barwidth" min="2" max="40" step="1" value="8" oninput="updateTextMetric('customBarWidth', this.value)">
+                    </div>
+
+                    <div class="bg-gray-100 p-2 border border-gray-200 rounded">
+                        <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                            <span>Interlinea</span> <span id="val-lineheight">1.2</span>
+                        </label>
+                        <input type="range" id="rng-lineheight" min="0.8" max="2.5" step="0.1" value="1.2" oninput="updateTextMetric('lineHeight', this.value)">
+                        
+                        <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1 mt-3">
+                            <span>Distanza Bordo (Padding)</span> <span id="val-padding">0</span>
+                        </label>
+                        <input type="range" id="rng-padding" min="0" max="60" step="1" value="0" oninput="updateTextMetric('customBgPadding', this.value)">
+                        
+                        <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1 mt-3">
+                            <span>Stondamento Angoli</span> <span id="val-radius">0</span>
+                        </label>
+                        <input type="range" id="rng-radius" min="0" max="60" step="1" value="0" oninput="updateTextMetric('customBgRadius', this.value)">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerH')">Centra ↔</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerV')">Centra ↕</button>
+                    </div>
+                    
+                    <hr class="border-gray-300 my-1">
+                    <button class="text-red-600 text-[11px] font-bold uppercase flex items-center justify-center gap-2 py-1 hover:bg-red-50" onclick="deleteSelectedObject()">
+                        Elimina Elemento
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 bg-gray-300 flex items-center justify-center p-8 relative overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiNjYmQ1ZTEiLz48L3N2Zz4=')]">
+                <div class="shadow-2xl border border-gray-400 bg-white relative" id="canvas-wrapper">
+                    <div id="guide-v" class="absolute top-0 bottom-0 left-1/2 w-px bg-brand-yellow z-50 pointer-events-none hidden"></div>
+                    <div id="guide-h" class="absolute left-0 right-0 top-1/2 h-px bg-brand-yellow z-50 pointer-events-none hidden"></div>
+                    <canvas id="fabric-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="modal-playground" class="fixed inset-0 z-50 bg-gray-900/95 hidden flex-col justify-center items-center p-4">
         <div class="absolute top-6 right-6">
             <button class="text-white hover:text-brand-yellow font-bold text-lg uppercase tracking-widest" onclick="closePlayground()">Chiudi X</button>
         </div>
-        
         <p class="text-brand-yellow mb-6 text-sm uppercase tracking-widest font-bold bg-brand-blue px-4 py-1">Simulatore Swipe Instagram (4:5)</p>
-        
         <div class="w-full max-w-[360px] aspect-[4/5] bg-black border-[12px] border-gray-800 rounded-[24px] shadow-2xl overflow-hidden relative">
-            <div id="playground-container" class="snap-container flex w-full h-full bg-black">
-                </div>
+            <div id="playground-container" class="snap-container flex w-full h-full bg-black"></div>
         </div>
-        <p class="text-gray-400 mt-4 text-xs">Scorri orizzontalmente all'interno della cornice</p>
     </div>
 
     <script>
+        // --- OVERRIDE FABRIC.JS (SFONDO E BARRE LATERALI) ---
+        fabric.Textbox.prototype.customBgPadding = 0;
+        fabric.Textbox.prototype.customBgRadius = 0;
+        fabric.Textbox.prototype.customBarPosition = 'none'; // 'none', 'left', 'right'
+        fabric.Textbox.prototype.customBarColor = '#0146bc';
+        fabric.Textbox.prototype.customBarWidth = 8;
+        
+        fabric.Textbox.prototype._renderBackground = function(ctx) {
+            var dim = this._getNonTransformedDimensions();
+            var pad = this.customBgPadding || 0;
+            var rx = this.customBgRadius || 0;
+            
+            var w = dim.x + pad * 2;
+            var h = dim.y + pad * 2;
+            var x = -dim.x / 2 - pad;
+            var y = -dim.y / 2 - pad;
+            
+            // 1. Sfondo Principale
+            if (this.backgroundColor) {
+                ctx.fillStyle = this.backgroundColor;
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(x, y, w, h, rx);
+                } else {
+                    ctx.rect(x, y, w, h);
+                }
+                ctx.fill();
+            }
+
+            // 2. Barra Grafica Decorativa
+            if (this.customBarPosition && this.customBarPosition !== 'none' && this.customBarWidth > 0) {
+                ctx.fillStyle = this.customBarColor;
+                var barW = this.customBarWidth;
+                ctx.beginPath();
+                
+                if (this.customBarPosition === 'left') {
+                    if (ctx.roundRect && rx > 0) ctx.roundRect(x, y, barW, h, [rx, 0, 0, rx]);
+                    else ctx.rect(x, y, barW, h);
+                } else if (this.customBarPosition === 'right') {
+                    if (ctx.roundRect && rx > 0) ctx.roundRect(x + w - barW, y, barW, h, [0, rx, rx, 0]);
+                    else ctx.rect(x + w - barW, y, barW, h);
+                }
+                ctx.fill();
+            }
+        };
+
         const state = {
             projectName: '',
             imgObj: null,
-            originalDataUrl: null, // Memorizza l'immagine in Base64
+            originalDataUrl: null, 
             baseScale: 1,
             scale: 1,
             x: 0,
@@ -279,413 +353,633 @@
             maxPossibleFrames: 1,
             excludedFrames: 0,
             finalFramesCount: 1,
-            isRestoring: false, // Flag di sicurezza per l'importazione
+            isRestoring: false, 
             viewportHeight: window.innerWidth < 768 ? 350 : 500,
+            framesData: [], 
             get frameWidth() { return this.viewportHeight * (4/5); } 
         };
 
         window.addEventListener('resize', () => {
             state.viewportHeight = window.innerWidth < 768 ? 350 : 500;
-            if(state.imgObj) {
-                // Se c'è un'immagine, ricalcoliamo la griglia al ridimensionamento
-                state.isRestoring = true; 
-                restoreEditorUI();
-            }
+            if(state.imgObj) { state.isRestoring = true; restoreEditorUI(); }
         });
 
-        // Helper pulsanti
         async function withButtonState(btn, activeText, workFn) {
             const originalText = btn.innerHTML;
-            const isPrimary = btn.classList.contains('btn-primary');
-            
-            btn.innerHTML = activeText;
-            btn.disabled = true;
+            btn.innerHTML = activeText; btn.disabled = true;
             try {
                 await workFn();
                 btn.innerHTML = "Fatto!";
-                
-                if(isPrimary) btn.classList.remove('btn-primary');
-                else btn.classList.remove('btn-secondary');
-                
-                btn.classList.add('bg-green-600', 'text-white', 'border-green-600');
-                
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    btn.classList.remove('bg-green-600', 'text-white', 'border-green-600');
-                    if(isPrimary) btn.classList.add('btn-primary');
-                    else btn.classList.add('btn-secondary');
-                }, 2000);
+                setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 2000);
             } catch (err) {
                 console.error(err);
                 btn.innerHTML = "Errore!";
-                btn.classList.add('bg-red-600', 'text-white', 'border-red-600');
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    btn.classList.remove('bg-red-600', 'text-white', 'border-red-600');
-                }, 3000);
+                setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 3000);
             }
         }
 
-        // Funzione Reset App
-        function resetApp() {
-            if(confirm("Sei sicuro di voler ricominciare? Tutti i dati non esportati in JSON andranno persi.")) {
-                window.location.reload();
-            }
-        }
-
-        // Setup Iniziale
         function startProject(btn) {
             const input = document.getElementById('project-name');
             const name = input.value.trim();
-            if (!name) {
-                alert("Inserisci un nome per il progetto per proseguire.");
-                return;
-            }
+            if (!name) return alert("Inserisci un nome progetto.");
             state.projectName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             document.getElementById('display-project-name').innerText = "Progetto: " + state.projectName;
-            
             document.getElementById('section-setup').classList.add('hidden');
             document.getElementById('section-upload').classList.remove('hidden');
         }
 
-        // Caricamento Immagine
         function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = (e) => {
-                state.originalDataUrl = e.target.result; // Salviamo la Base64 per l'export
+                state.originalDataUrl = e.target.result;
                 const img = new Image();
-                img.onload = () => {
-                    state.imgObj = img;
-                    initEditor();
-                };
+                img.onload = () => { state.imgObj = img; initEditor(); };
                 img.src = state.originalDataUrl;
             };
             reader.readAsDataURL(file);
         }
 
-        // Importazione JSON
         function handleImportJSON(event) {
             const file = event.target.files[0];
             if(!file) return;
-            
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    
-                    if(!data.originalDataUrl || !data.projectName) {
-                        throw new Error("File JSON non valido o corrotto.");
-                    }
-
-                    // Popoliamo lo State
                     state.projectName = data.projectName;
                     state.originalDataUrl = data.originalDataUrl;
-                    state.scale = data.scale;
-                    state.x = data.x;
-                    state.y = data.y;
+                    state.scale = data.scale; state.x = data.x; state.y = data.y;
                     state.excludedFrames = data.excludedFrames || 0;
-                    
-                    state.isRestoring = true; // Segnaliamo al motore di usare i dati importati
-
-                    // Ricostruiamo l'immagine
+                    state.framesData = data.framesData || []; 
+                    state.isRestoring = true;
                     const img = new Image();
-                    img.onload = () => {
-                        state.imgObj = img;
-                        restoreEditorUI();
-                    };
+                    img.onload = () => { state.imgObj = img; restoreEditorUI(); };
                     img.src = state.originalDataUrl;
-
-                } catch(err) {
-                    alert("Errore nel caricamento del file JSON: " + err.message);
-                }
+                } catch(err) { alert("Errore file JSON: " + err.message); }
             };
             reader.readAsText(file);
         }
 
-        // Inizializza Editor da zero
         function initEditor() {
             document.getElementById('section-upload').classList.add('hidden');
             document.getElementById('section-editor').classList.remove('hidden');
             document.getElementById('section-editor').classList.add('flex');
-
             document.getElementById('preview-img').src = state.imgObj.src;
-
             state.baseScale = state.viewportHeight / state.imgObj.naturalHeight;
-            state.scale = state.baseScale;
-            state.x = 0;
-            state.y = 0;
-            state.excludedFrames = 0; 
-            
+            state.scale = state.baseScale; state.x = 0; state.y = 0; state.excludedFrames = 0; 
             const scaleSlider = document.getElementById('slider-scale');
-            scaleSlider.min = state.baseScale;
-            scaleSlider.max = Math.max(1.5, state.baseScale * 5); 
-            scaleSlider.value = state.baseScale;
-
+            scaleSlider.min = state.baseScale; scaleSlider.max = Math.max(1.5, state.baseScale * 5); scaleSlider.value = state.baseScale;
             document.getElementById('slider-exclude').value = 0;
-
             updateEditorState();
         }
 
-        // Inizializza Editor da JSON importato
         function restoreEditorUI() {
             document.getElementById('section-setup').classList.add('hidden');
             document.getElementById('section-upload').classList.add('hidden');
             document.getElementById('section-editor').classList.remove('hidden');
             document.getElementById('section-editor').classList.add('flex');
-
             document.getElementById('display-project-name').innerText = "Progetto: " + state.projectName;
             document.getElementById('preview-img').src = state.imgObj.src;
-
             state.baseScale = state.viewportHeight / state.imgObj.naturalHeight;
-            
             const scaleSlider = document.getElementById('slider-scale');
-            scaleSlider.min = state.baseScale;
-            scaleSlider.max = Math.max(1.5, state.baseScale * 5);
-            scaleSlider.value = state.scale; // Usiamo lo scale importato
-
+            scaleSlider.min = state.baseScale; scaleSlider.max = Math.max(1.5, state.baseScale * 5); scaleSlider.value = state.scale;
             document.getElementById('slider-exclude').value = state.excludedFrames;
-
             updateEditorState();
         }
 
-        // Motore logico UI e Tagli
         function updateEditorState() {
             if (!state.imgObj) return;
-
             state.scale = parseFloat(document.getElementById('slider-scale').value);
             
             const scaledW = state.imgObj.naturalWidth * state.scale;
             const scaledH = state.imgObj.naturalHeight * state.scale;
-
             let maxFrames = Math.floor(scaledW / state.frameWidth);
-            if (maxFrames < 1) maxFrames = 1;
-            if (maxFrames > 10) maxFrames = 10;
+            if (maxFrames < 1) maxFrames = 1; if (maxFrames > 10) maxFrames = 10;
             state.maxPossibleFrames = maxFrames;
 
             const excludeSlider = document.getElementById('slider-exclude');
-            
             if (maxFrames >= 2) {
-                excludeSlider.disabled = false;
-                let maxExcludable = maxFrames - 1;
-                excludeSlider.max = maxExcludable;
-                
-                if (parseInt(excludeSlider.value) > maxExcludable) {
-                    excludeSlider.value = maxExcludable;
-                }
+                excludeSlider.disabled = false; excludeSlider.max = maxFrames - 1;
+                if (parseInt(excludeSlider.value) > maxFrames - 1) excludeSlider.value = maxFrames - 1;
             } else {
-                excludeSlider.max = 0;
-                excludeSlider.value = 0;
-                excludeSlider.disabled = true;
+                excludeSlider.max = 0; excludeSlider.value = 0; excludeSlider.disabled = true;
             }
-            
             state.excludedFrames = parseInt(excludeSlider.value) || 0;
             document.getElementById('exclude-value').innerText = state.excludedFrames;
 
             state.finalFramesCount = state.maxPossibleFrames - state.excludedFrames;
             const totalActiveWidth = state.finalFramesCount * state.frameWidth;
 
-            let minX = totalActiveWidth - scaledW;
-            if (minX > 0) minX = 0;
-            const sliderX = document.getElementById('slider-x');
-            sliderX.min = minX;
-            sliderX.max = 0;
-            
-            let minY = state.viewportHeight - scaledH;
-            if (minY > 0) minY = 0;
-            const sliderY = document.getElementById('slider-y');
-            sliderY.min = minY;
-            sliderY.max = 0;
-
-            // Se stiamo ripristinando un JSON, imponiamo le coordinate importate agli slider
-            if (state.isRestoring) {
-                sliderX.value = state.x;
-                sliderY.value = state.y;
-                state.isRestoring = false; // Ripristino completato, liberiamo il flag
+            if (!state.framesData || state.framesData.length !== state.finalFramesCount) {
+                state.framesData = Array.from({ length: state.finalFramesCount }, (_, i) => state.framesData[i] || {});
             }
 
+            let minX = totalActiveWidth - scaledW; if (minX > 0) minX = 0;
+            const sliderX = document.getElementById('slider-x'); sliderX.min = minX; sliderX.max = 0;
+            let minY = state.viewportHeight - scaledH; if (minY > 0) minY = 0;
+            const sliderY = document.getElementById('slider-y'); sliderY.min = minY; sliderY.max = 0;
+
+            if (state.isRestoring) { sliderX.value = state.x; sliderY.value = state.y; state.isRestoring = false; }
             state.x = Math.max(minX, Math.min(0, parseFloat(sliderX.value) || 0));
             state.y = Math.max(minY, Math.min(0, parseFloat(sliderY.value) || 0));
-            sliderX.value = state.x;
-            sliderY.value = state.y;
+            sliderX.value = state.x; sliderY.value = state.y;
 
-            const imgEl = document.getElementById('preview-img');
-            imgEl.style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
-
-            const gridContainer = document.getElementById('grid-container');
-            const cropArea = document.getElementById('crop-area');
+            document.getElementById('preview-img').style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+            document.getElementById('crop-area').style.width = `${totalActiveWidth}px`;
             
-            cropArea.style.width = `${totalActiveWidth}px`;
+            const gridContainer = document.getElementById('grid-container');
             gridContainer.innerHTML = ''; 
 
             for(let i = 0; i < state.finalFramesCount; i++) {
                 const frame = document.createElement('div');
                 frame.style.width = `${state.frameWidth}px`;
                 frame.style.height = `${state.viewportHeight}px`;
-                
                 let borderClass = 'border-2 border-brand-yellow';
                 if (i > 0) borderClass += ' border-l-2 border-dashed border-l-brand-yellow/70';
                 
-                frame.className = `${borderClass} flex items-center justify-center bg-black/5 flex-shrink-0 relative`;
+                frame.className = `${borderClass} flex items-center justify-center bg-black/5 flex-shrink-0 relative group pointer-events-auto cursor-default`;
                 
+                const thumbImg = document.createElement('img');
+                thumbImg.id = `thumb-img-${i}`;
+                thumbImg.className = 'absolute inset-0 w-full h-full pointer-events-none z-0 object-contain';
+                
+                if(state.framesData[i] && state.framesData[i].thumbnailBase64) {
+                    thumbImg.src = state.framesData[i].thumbnailBase64;
+                } else if(state.framesData[i] && state.framesData[i].fabricJSON) {
+                    const tempCanvas = new fabric.StaticCanvas(null, { width: state.frameWidth, height: state.viewportHeight });
+                    tempCanvas.loadFromJSON(state.framesData[i].fabricJSON, () => {
+                        thumbImg.src = tempCanvas.toDataURL({ format: 'png' });
+                    });
+                }
+
                 const label = document.createElement('span');
-                label.className = 'absolute bottom-3 left-3 bg-brand-yellow text-brand-blue font-bold text-lg px-3 py-1';
+                label.className = 'absolute bottom-3 left-3 bg-brand-yellow text-brand-blue font-bold text-lg px-3 py-1 z-10 pointer-events-none shadow-md';
                 label.innerText = i + 1;
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'absolute bottom-3 right-3 bg-brand-blue text-white py-1.5 px-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20 cursor-pointer shadow-md hover:bg-brand-bluedark flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider border border-white/20';
+                editBtn.innerHTML = `Modifica Testi`;
+                editBtn.onclick = () => openAdvancedTextEditor(i);
                 
+                frame.appendChild(thumbImg);
                 frame.appendChild(label);
+                frame.appendChild(editBtn);
                 gridContainer.appendChild(frame);
             }
         }
 
-        // Estrazione Base
-        async function extractFramesAsBlobs() {
-            const blobs = [];
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            const targetW = 1080;
-            const targetH = 1350;
-            canvas.width = targetW;
-            canvas.height = targetH;
+                let previewTimeout = null;
+        const CUSTOM_FABRIC_PROPS = [
+            'customBgPadding',
+            'customBgRadius',
+            'customBarPosition',
+            'customBarColor',
+            'customBarWidth'
+        ];
+        
+        window.debouncedSyncPreview = function() {
+            if (previewTimeout) clearTimeout(previewTimeout);
+            previewTimeout = setTimeout(() => { syncPreview(); }, 250); 
+        };
 
-            for (let i = 0; i < state.finalFramesCount; i++) {
-                ctx.clearRect(0, 0, targetW, targetH);
-                ctx.fillStyle = "white"; 
-                ctx.fillRect(0, 0, targetW, targetH);
-
-                const framePreviewX = i * state.frameWidth;
-                
-                const sourceX = (framePreviewX - state.x) / state.scale;
-                const sourceY = Math.abs(state.y) / state.scale;
-                const sourceW = state.frameWidth / state.scale;
-                const sourceH = state.viewportHeight / state.scale;
-
-                ctx.drawImage(
-                    state.imgObj,
-                    sourceX, sourceY, sourceW, sourceH, 
-                    0, 0, targetW, targetH               
-                );
-
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
-                blobs.push(blob);
-            }
-            return blobs;
+        function prepareFabricForSave(canvas) {
+            if (!canvas) return;
+            canvas.getObjects().forEach(obj => {
+                if (obj.type === 'textbox') {
+                    obj.dirty = true;
+                    obj.initDimensions();
+                    obj.setCoords();
+                }
+            });
+            canvas.renderAll();
         }
 
-        // Export Singoli File
-        function exportIndividualFrames(btn) {
-            withButtonState(btn, "Export...", async () => {
-                const blobs = await extractFramesAsBlobs();
-                
-                for (let i = 0; i < blobs.length; i++) {
-                    const blob = blobs[i];
-                    const num = String(i + 1).padStart(2, '0');
-                    const filename = `${state.projectName}_${num}.jpg`;
-                    const url = URL.createObjectURL(blob);
-                    
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = filename;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    // Ritardo strategico per evitare che il browser blocchi i download multipli simultanei
-                    await new Promise(resolve => setTimeout(resolve, 300));
-                    URL.revokeObjectURL(url);
-                }
+        function getFrameFabricJSON(canvas) {
+            const tempBg = canvas.backgroundImage;
+            canvas.backgroundImage = null;
+            prepareFabricForSave(canvas);
+            const json = canvas.toJSON(CUSTOM_FABRIC_PROPS);
+            canvas.backgroundImage = tempBg;
+            canvas.renderAll();
+            return json;
+        }
+
+                function loadImageFromDataURL(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = dataUrl;
             });
         }
 
-        // Export Immagini (ZIP)
+        async function renderFabricLayerDataURL(fabricJSON, targetW, targetH, qualityMultiplier = 1) {
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+
+            const layer = new fabric.StaticCanvas(null, {
+                width: state.frameWidth,
+                height: state.viewportHeight,
+                preserveObjectStacking: true,
+                renderOnAddRemove: false
+            });
+
+            await new Promise(resolve => {
+                layer.loadFromJSON(fabricJSON, () => {
+                    layer.setBackgroundImage(null, () => {});
+
+                    layer.getObjects().forEach(obj => {
+                        obj.set({
+                            objectCaching: false,
+                            dirty: true
+                        });
+
+                        if (obj.type === 'textbox') {
+                            obj.initDimensions();
+                        }
+
+                        obj.setCoords();
+                    });
+
+                    layer.renderAll();
+                    resolve();
+                });
+            });
+
+            const multiplier = Math.max(
+                targetW / state.frameWidth,
+                targetH / state.viewportHeight
+            ) * qualityMultiplier;
+
+            const dataUrl = layer.toDataURL({
+                format: 'png',
+                multiplier: multiplier,
+                enableRetinaScaling: false
+            });
+
+            layer.dispose();
+            return dataUrl;
+        }
+
+        window.syncPreview = async function() {
+            if (currentEditingFrameIndex === -1 || !fCanvas) return;
+
+            const activeObj = fCanvas.getActiveObject();
+            if (activeObj && activeObj.isEditing) {
+                activeObj.exitEditing();
+            }
+
+            if (!state.framesData[currentEditingFrameIndex]) {
+                state.framesData[currentEditingFrameIndex] = {};
+            }
+
+            const fabricJSON = getFrameFabricJSON(fCanvas);
+            state.framesData[currentEditingFrameIndex].fabricJSON = fabricJSON;
+
+            const dataUrl = await renderFabricLayerDataURL(
+                fabricJSON,
+                state.frameWidth,
+                state.viewportHeight,
+                2
+            );
+
+            state.framesData[currentEditingFrameIndex].thumbnailBase64 = dataUrl;
+
+            const thumbImg = document.getElementById(`thumb-img-${currentEditingFrameIndex}`);
+            if (thumbImg) thumbImg.src = dataUrl;
+        };
+
+        let fCanvas = null;
+        let currentEditingFrameIndex = -1;
+
+        function initFabricCanvas() {
+            if (fCanvas) return;
+            fCanvas = new fabric.Canvas('fabric-canvas', { preserveObjectStacking: true });
+            
+            fCanvas.on('selection:created', syncUIControls);
+            fCanvas.on('selection:updated', syncUIControls);
+            fCanvas.on('selection:cleared', () => {
+                document.getElementById('text-controls').classList.add('hidden');
+                document.getElementById('text-controls').classList.remove('flex');
+            });
+
+            fCanvas.on('object:modified', debouncedSyncPreview);
+
+            fCanvas.on('object:moving', function(e) {
+                const obj = e.target;
+                const center = fCanvas.getCenter();
+                const snapT = 15;
+                document.getElementById('guide-v').classList.add('hidden');
+                document.getElementById('guide-h').classList.add('hidden');
+
+                if (Math.abs(obj.left + (obj.width * obj.scaleX)/2 - center.left) < snapT) {
+                    obj.left = center.left - (obj.width * obj.scaleX)/2;
+                    document.getElementById('guide-v').classList.remove('hidden');
+                }
+                if (Math.abs(obj.top + (obj.height * obj.scaleY)/2 - center.top) < snapT) {
+                    obj.top = center.top - (obj.height * obj.scaleY)/2;
+                    document.getElementById('guide-h').classList.remove('hidden');
+                }
+                debouncedSyncPreview();
+            });
+
+            fCanvas.on('mouse:up', () => {
+                document.getElementById('guide-v').classList.add('hidden');
+                document.getElementById('guide-h').classList.add('hidden');
+            });
+        }
+
+        window.openAdvancedTextEditor = function(frameIndex) {
+            currentEditingFrameIndex = frameIndex;
+            initFabricCanvas();
+            
+            fCanvas.clear();
+            fCanvas.setWidth(state.frameWidth);
+            fCanvas.setHeight(state.viewportHeight);
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = state.frameWidth; tempCanvas.height = state.viewportHeight;
+            const ctx = tempCanvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            const sourceX = ((frameIndex * state.frameWidth) - state.x) / state.scale;
+            const sourceY = Math.abs(state.y) / state.scale;
+            const sourceW = state.frameWidth / state.scale;
+            const sourceH = state.viewportHeight / state.scale;
+
+            ctx.drawImage(state.imgObj, sourceX, sourceY, sourceW, sourceH, 0, 0, state.frameWidth, state.viewportHeight);
+            
+            fabric.Image.fromURL(tempCanvas.toDataURL('image/png'), function(img) {
+                fCanvas.setBackgroundImage(img, fCanvas.renderAll.bind(fCanvas));
+            });
+
+            document.getElementById('modal-editor').classList.remove('hidden');
+            document.getElementById('modal-editor').classList.add('flex');
+            
+            document.getElementById('text-controls').classList.add('hidden');
+            
+            if (state.framesData[frameIndex] && state.framesData[frameIndex].fabricJSON) {
+                fCanvas.loadFromJSON(state.framesData[frameIndex].fabricJSON, () => {
+                    fCanvas.setBackgroundImage(fCanvas.backgroundImage, fCanvas.renderAll.bind(fCanvas));
+                    prepareFabricForSave(fCanvas);
+                });
+            }
+        };
+
+        window.closeAdvancedEditor = async function() {
+            if (fCanvas && fCanvas.getActiveObject() && fCanvas.getActiveObject().isEditing) {
+                fCanvas.getActiveObject().exitEditing();
+            }
+            await syncPreview(); 
+            fCanvas.discardActiveObject().renderAll();
+            document.getElementById('modal-editor').classList.add('hidden');
+            document.getElementById('modal-editor').classList.remove('flex');
+        };
+
+        window.addPreset = function(type) {
+            // Nota: editable è tornato TRUE per consentire stile granulare
+            let options = {
+                left: 50, top: 50, width: 300, fontFamily: 'Montserrat', textAlign: 'center', editable: true
+            };
+
+            if (type === 'title') {
+                options = { ...options, text: "TITOLO IN EVIDENZA", fontSize: 36, fontWeight: 'bold', fill: '#0146bc', backgroundColor: '' };
+            } else if (type === 'label') {
+                options = { ...options, text: "Scrivi Qui", fontSize: 24, fill: '#ffffff', backgroundColor: '#0146bc', customBgPadding: 15, customBgRadius: 12 };
+            } else if (type === 'quote') {
+                options = { ...options, text: "\"Una citazione molto importante che fa riflettere.\"", fontSize: 20, fontStyle: 'italic', fill: '#333333', backgroundColor: '#ffffff', customBgPadding: 20, customBgRadius: 8, customBarPosition: 'left', customBarColor: '#eddc01', customBarWidth: 8 };
+            }
+
+            const text = new fabric.Textbox(options.text, options);
+            fCanvas.add(text); fCanvas.centerObject(text); fCanvas.setActiveObject(text);
+            syncPreview();
+        };
+
+        window.applyQuickColor = function(hex, prop, inputId) {
+            const el = document.getElementById(inputId);
+            if(el) el.value = hex;
+            updateSelectedObject(prop, hex);
+        };
+
+        function syncUIControls() { 
+            const obj = fCanvas.getActiveObject();
+            if(obj && obj.type === 'textbox') {
+                document.getElementById('text-controls').classList.remove('hidden');
+                document.getElementById('text-controls').classList.add('flex');
+                
+                document.getElementById('text-content-input').value = obj.text || '';
+
+                document.getElementById('font-family').value = obj.fontFamily || 'Inter';
+                document.getElementById('text-color').value = obj.fill || '#000000';
+                document.getElementById('bg-color').value = obj.backgroundColor || '#ffffff';
+                
+                document.getElementById('bar-position').value = obj.customBarPosition || 'none';
+                document.getElementById('bar-color').value = obj.customBarColor || '#0146bc';
+                
+                document.getElementById('rng-barwidth').value = obj.customBarWidth || 8;
+                document.getElementById('val-barwidth').innerText = obj.customBarWidth || 8;
+
+                document.getElementById('rng-lineheight').value = obj.lineHeight || 1.16;
+                document.getElementById('val-lineheight').innerText = obj.lineHeight || 1.16;
+                
+                document.getElementById('rng-padding').value = obj.customBgPadding || 0;
+                document.getElementById('val-padding').innerText = obj.customBgPadding || 0;
+                
+                document.getElementById('rng-radius').value = obj.customBgRadius || 0;
+                document.getElementById('val-radius').innerText = obj.customBgRadius || 0;
+            }
+        }
+
+        window.updateSelectedText = function(newText) {
+            const obj = fCanvas.getActiveObject();
+            if (obj && obj.type === 'textbox') { 
+                obj.set('text', newText);
+                obj.initDimensions();
+                obj.setCoords();
+                fCanvas.requestRenderAll(); 
+                debouncedSyncPreview(); 
+            }
+        };
+
+        // GESTIONE GRANULARE DEGLI STILI 
+        window.updateSelectedObject = function(property, value) {
+            const obj = fCanvas.getActiveObject();
+            if (obj && obj.type === 'textbox') { 
+                // Se l'utente sta modificando e ha evidenziato del testo
+                if (obj.isEditing && obj.selectionStart !== obj.selectionEnd) {
+                    let styleObj = {};
+                    styleObj[property] = value;
+                    obj.setSelectionStyles(styleObj);
+                } else {
+                    obj.set(property, value); 
+                }
+                obj.dirty = true;
+                obj.initDimensions();
+                obj.setCoords();
+                fCanvas.requestRenderAll(); 
+                debouncedSyncPreview(); 
+            }
+        };
+
+        window.toggleTextWeight = function() {
+            const obj = fCanvas.getActiveObject();
+            if(obj && obj.type === 'textbox') { 
+                const isBold = obj.fontWeight === 'bold';
+                const newVal = isBold ? 'normal' : 'bold';
+                
+                if (obj.isEditing && obj.selectionStart !== obj.selectionEnd) {
+                    obj.setSelectionStyles({ fontWeight: newVal });
+                } else {
+                    obj.set('fontWeight', newVal); 
+                }
+                obj.dirty = true;
+                obj.initDimensions();
+                obj.setCoords();
+                fCanvas.requestRenderAll(); 
+                debouncedSyncPreview(); 
+            }
+        };
+
+        window.toggleTextItalic = function() {
+            const obj = fCanvas.getActiveObject();
+            if(obj && obj.type === 'textbox') { 
+                const isItalic = obj.fontStyle === 'italic';
+                const newVal = isItalic ? 'normal' : 'italic';
+
+                if (obj.isEditing && obj.selectionStart !== obj.selectionEnd) {
+                    obj.setSelectionStyles({ fontStyle: newVal });
+                } else {
+                    obj.set('fontStyle', newVal); 
+                }
+                obj.dirty = true;
+                obj.initDimensions();
+                obj.setCoords();
+                fCanvas.requestRenderAll(); 
+                debouncedSyncPreview(); 
+            }
+        };
+
+        window.updateTextMetric = function(property, value) {
+            const obj = fCanvas.getActiveObject();
+            if (obj && obj.type === 'textbox') {
+                const numVal = (property === 'customBarPosition' || property === 'customBarColor') ? value : parseFloat(value);
+                obj.set(property, numVal);
+                
+                if(property === 'lineHeight') document.getElementById('val-lineheight').innerText = numVal;
+                if(property === 'customBgPadding') document.getElementById('val-padding').innerText = numVal;
+                if(property === 'customBgRadius') document.getElementById('val-radius').innerText = numVal;
+                if(property === 'customBarWidth') document.getElementById('val-barwidth').innerText = numVal;
+                
+                obj.dirty = true;
+                obj.initDimensions();
+                obj.setCoords();
+                fCanvas.requestRenderAll();
+                debouncedSyncPreview();
+            }
+        };
+
+        window.alignObject = function(mode) {
+            const obj = fCanvas.getActiveObject();
+            if(obj) {
+                if(mode === 'centerH') fCanvas.viewportCenterObjectH(obj);
+                if(mode === 'centerV') fCanvas.viewportCenterObjectV(obj);
+                obj.setCoords(); fCanvas.requestRenderAll();
+                syncPreview();
+            }
+        };
+
+        window.deleteSelectedObject = function() {
+            const obj = fCanvas.getActiveObject();
+            if (obj) { fCanvas.remove(obj); document.getElementById('text-controls').classList.add('hidden'); syncPreview(); }
+        };
+
+        // --- ESPORTAZIONE AD ALTA RISOLUZIONE VETTORIALE ---
+        async function extractFramesAsBlobs() {
+            if (fCanvas && currentEditingFrameIndex !== -1) {
+                await syncPreview();
+            }
+
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+
+            const blobs = [];
+            const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+            const targetW = 1080; const targetH = 1350;
+            canvas.width = targetW; canvas.height = targetH;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            for (let i = 0; i < state.finalFramesCount; i++) {
+                ctx.clearRect(0, 0, targetW, targetH);
+                ctx.fillStyle = "white"; ctx.fillRect(0, 0, targetW, targetH);
+
+                const framePreviewX = i * state.frameWidth;
+                const sourceX = (framePreviewX - state.x) / state.scale; const sourceY = Math.abs(state.y) / state.scale;
+                const sourceW = state.frameWidth / state.scale; const sourceH = state.viewportHeight / state.scale;
+
+                ctx.drawImage(state.imgObj, sourceX, sourceY, sourceW, sourceH, 0, 0, targetW, targetH);
+
+                if (state.framesData[i] && state.framesData[i].fabricJSON) {
+                    const overlayDataUrl = await renderFabricLayerDataURL(
+                        state.framesData[i].fabricJSON,
+                        targetW,
+                        targetH,
+                        1
+                    );
+
+                    const overlayImg = await loadImageFromDataURL(overlayDataUrl);
+                    ctx.drawImage(overlayImg, 0, 0, targetW, targetH);
+                }
+
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 1.0));
+                blobs.push(blob);
+            }
+                        return blobs;
+        }
+
         function exportCarousel(btn) {
             withButtonState(btn, "ZIP...", async () => {
                 const blobs = await extractFramesAsBlobs();
                 const zip = new JSZip();
-                
-                blobs.forEach((blob, index) => {
-                    const num = String(index + 1).padStart(2, '0');
-                    const filename = `${state.projectName}_${num}.jpg`;
-                    zip.file(filename, blob);
-                });
-
+                blobs.forEach((b, i) => zip.file(`${state.projectName}_${String(i + 1).padStart(2, '0')}.jpg`, b));
                 const zipBlob = await zip.generateAsync({type: "blob"});
-                
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(zipBlob);
-                link.download = `${state.projectName}_carousel.zip`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(link.href);
+                const link = document.createElement('a'); link.href = URL.createObjectURL(zipBlob); link.download = `${state.projectName}_carousel.zip`;
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
             });
         }
 
-        // Export Progetto (JSON)
         function exportProjectJSON(btn) {
             withButtonState(btn, "Salvataggio...", async () => {
-                const projectData = {
-                    projectName: state.projectName,
-                    originalDataUrl: state.originalDataUrl,
-                    scale: state.scale,
-                    x: state.x,
-                    y: state.y,
-                    excludedFrames: state.excludedFrames
-                };
-
-                const jsonString = JSON.stringify(projectData);
-                const blob = new Blob([jsonString], {type: "application/json"});
-                const url = URL.createObjectURL(blob);
-                
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `${state.projectName}_backup.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
+                const projectData = { projectName: state.projectName, originalDataUrl: state.originalDataUrl, scale: state.scale, x: state.x, y: state.y, excludedFrames: state.excludedFrames, framesData: state.framesData };
+                const blob = new Blob([JSON.stringify(projectData)], {type: "application/json"});
+                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${state.projectName}_backup.json`;
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
             });
         }
 
-        // Playground
         function openPlayground(btn) {
             withButtonState(btn, "Caricamento...", async () => {
                 const container = document.getElementById('playground-container');
-                container.innerHTML = ''; 
-                container.scrollLeft = 0; 
-                
+                container.innerHTML = ''; container.scrollLeft = 0; 
                 const blobs = await extractFramesAsBlobs();
-                
                 for (const blob of blobs) {
-                    const url = URL.createObjectURL(blob);
-                    const img = document.createElement('img');
-                    img.src = url;
-                    img.className = "snap-item flex-none"; 
-                    container.appendChild(img);
+                    const img = document.createElement('img'); img.src = URL.createObjectURL(blob); img.className = "snap-item flex-none"; container.appendChild(img);
                 }
-
-                document.getElementById('modal-playground').classList.remove('hidden');
-                document.getElementById('modal-playground').classList.add('flex');
-                document.body.style.overflow = 'hidden'; 
+                document.getElementById('modal-playground').classList.remove('hidden'); document.getElementById('modal-playground').classList.add('flex');
             });
         }
-
         function closePlayground() {
-            document.getElementById('modal-playground').classList.add('hidden');
-            document.getElementById('modal-playground').classList.remove('flex');
-            document.body.style.overflow = ''; 
-            
-            const container = document.getElementById('playground-container');
-            const imgs = container.getElementsByTagName('img');
-            for(let img of imgs) {
-                URL.revokeObjectURL(img.src);
-            }
-            container.innerHTML = '';
+            document.getElementById('modal-playground').classList.add('hidden'); document.getElementById('modal-playground').classList.remove('flex');
+            const imgs = document.getElementById('playground-container').getElementsByTagName('img');
+            for(let img of imgs) URL.revokeObjectURL(img.src);
         }
     </script>
 </body>
 </html>
+
+```
