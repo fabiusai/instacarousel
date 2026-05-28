@@ -119,12 +119,27 @@
                         <input type="range" id="slider-y" step="1" value="0" oninput="updateEditorState()">
                     </div>
                     
-                    <div id="exclude-container" class="mt-2 pt-4 border-t border-gray-300">
+                                        <div id="exclude-container" class="mt-2 pt-4 border-t border-gray-300">
                         <label class="flex justify-between text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">
-                            <span>Escludi frame finali</span>
+                            <span>Escludi frame finali immagine</span>
                             <span id="exclude-value" class="text-brand-blue font-bold text-base bg-white px-2 py-0.5 border border-gray-300">0</span>
                         </label>
                         <input type="range" id="slider-exclude" min="0" max="0" step="1" value="0" oninput="updateEditorState()">
+                    </div>
+
+                    <div class="mt-2 pt-4 border-t border-gray-300 flex flex-col gap-2">
+                        <input type="file" id="replace-image-upload" class="hidden" accept="image/png, image/jpeg" onchange="handleReplaceMainImage(event)">
+                        <button class="btn-secondary w-full text-[11px] py-2" onclick="document.getElementById('replace-image-upload').click()">Sostituisci immagine</button>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="btn-secondary text-[11px] px-1 py-2" onclick="addBlankFrame('before')">+ Vuoto prima</button>
+                            <button class="btn-secondary text-[11px] px-1 py-2" onclick="addBlankFrame('after')">+ Vuoto dopo</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1 hover:bg-gray-100" onclick="removeBlankFrame('before')">- Prima</button>
+                            <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1 hover:bg-gray-100" onclick="removeBlankFrame('after')">- Dopo</button>
+                        </div>
+                        <p class="text-[10px] text-gray-600">Vuoti: <span id="blank-before-value">0</span> prima / <span id="blank-after-value">0</span> dopo</p>
                     </div>
                     
                     <div class="mt-6 pt-5 border-t-2 border-gray-300 flex flex-col gap-3">
@@ -307,8 +322,11 @@
         fabric.Textbox.prototype.customBgPadding = 0;
         fabric.Textbox.prototype.customBgRadius = 0;
         fabric.Textbox.prototype.customBarPosition = 'none'; // 'none', 'left', 'right'
-        fabric.Textbox.prototype.customBarColor = '#0146bc';
+                fabric.Textbox.prototype.customBarColor = '#0146bc';
         fabric.Textbox.prototype.customBarWidth = 8;
+        fabric.Textbox.prototype.customQuoteEnabled = false;
+        fabric.Textbox.prototype.customQuoteColor = '#eddc01';
+        fabric.Textbox.prototype.customQuoteSize = 58;
         
         fabric.Textbox.prototype._renderBackground = function(ctx) {
             var dim = this._getNonTransformedDimensions();
@@ -320,7 +338,6 @@
             var x = -dim.x / 2 - pad;
             var y = -dim.y / 2 - pad;
             
-            // 1. Sfondo Principale
             if (this.backgroundColor) {
                 ctx.fillStyle = this.backgroundColor;
                 ctx.beginPath();
@@ -332,7 +349,6 @@
                 ctx.fill();
             }
 
-            // 2. Barra Grafica Decorativa
             if (this.customBarPosition && this.customBarPosition !== 'none' && this.customBarWidth > 0) {
                 ctx.fillStyle = this.customBarColor;
                 var barW = this.customBarWidth;
@@ -347,24 +363,69 @@
                 }
                 ctx.fill();
             }
-        };
 
-        const state = {
+            if (this.customQuoteEnabled) {
+                var quoteSize = this.customQuoteSize || Math.max(44, (this.fontSize || 20) * 2.8);
+                var inset = Math.max(12, pad * 0.55);
+                ctx.save();
+                ctx.fillStyle = this.customQuoteColor || '#eddc01';
+                ctx.font = '700 ' + quoteSize + 'px ' + (this.fontFamily || 'Montserrat');
+                ctx.globalAlpha = 0.95;
+                ctx.textBaseline = 'top';
+                ctx.textAlign = 'left';
+                ctx.fillText('“', x + inset, y + Math.max(2, pad * 0.1));
+                ctx.textBaseline = 'bottom';
+                ctx.textAlign = 'right';
+                ctx.fillText('”', x + w - inset, y + h - Math.max(2, pad * 0.05));
+                ctx.restore();
+            }
+                };
+
+                if (!fabric.Rect.prototype._decorBoxRenderPatched) {
+            fabric.Rect.prototype._decorBoxOriginalRender = fabric.Rect.prototype._render;
+            fabric.Rect.prototype._render = function(ctx) {
+                fabric.Rect.prototype._decorBoxOriginalRender.call(this, ctx);
+
+                if (!this.isDecorBox) return;
+
+                var w = this.width || 0;
+                var h = this.height || 0;
+                var x = -w / 2;
+                var y = -h / 2;
+                var barW = Math.max(1, parseFloat(this.customBoxBarWidth) || 8);
+
+                ctx.save();
+                ctx.fillStyle = this.customBoxBarColor || '#eddc01';
+
+                if (this.customBoxBarLeft) ctx.fillRect(x, y, Math.min(barW, w), h);
+                if (this.customBoxBarRight) ctx.fillRect(x + w - Math.min(barW, w), y, Math.min(barW, w), h);
+                if (this.customBoxBarTop) ctx.fillRect(x, y, w, Math.min(barW, h));
+                if (this.customBoxBarBottom) ctx.fillRect(x, y + h - Math.min(barW, h), w, Math.min(barW, h));
+
+                ctx.restore();
+            };
+            fabric.Rect.prototype._decorBoxRenderPatched = true;
+        }
+
+                var state = window.__carouselGeneratorState || (window.__carouselGeneratorState = {
             projectName: '',
             imgObj: null,
-            originalDataUrl: null, 
+            originalDataUrl: null,
             baseScale: 1,
             scale: 1,
             x: 0,
             y: 0,
             maxPossibleFrames: 1,
+            imageFramesCount: 1,
+            leadingBlankFrames: 0,
+            trailingBlankFrames: 0,
             excludedFrames: 0,
             finalFramesCount: 1,
-            isRestoring: false, 
+            isRestoring: false,
             viewportHeight: window.innerWidth < 768 ? 350 : 500,
-            framesData: [], 
-            get frameWidth() { return this.viewportHeight * (4/5); } 
-        };
+            framesData: [],
+            get frameWidth() { return this.viewportHeight * (4/5); }
+        });
 
         window.addEventListener('resize', () => {
             state.viewportHeight = window.innerWidth < 768 ? 350 : 500;
@@ -395,17 +456,81 @@
             document.getElementById('section-upload').classList.remove('hidden');
         }
 
-        function handleImageUpload(event) {
+                function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+            loadMainImageFile(file, () => initEditor());
+        }
+
+        function loadMainImageFile(file, onReady) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 state.originalDataUrl = e.target.result;
                 const img = new Image();
-                img.onload = () => { state.imgObj = img; initEditor(); };
+                img.onload = () => {
+                    state.imgObj = img;
+                    onReady();
+                };
                 img.src = state.originalDataUrl;
             };
             reader.readAsDataURL(file);
+        }
+
+        function handleReplaceMainImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            loadMainImageFile(file, () => {
+                state.baseScale = state.viewportHeight / state.imgObj.naturalHeight;
+                state.scale = state.baseScale;
+                state.x = 0;
+                state.y = 0;
+                state.isRestoring = true;
+
+                state.framesData.forEach(frame => {
+                    if (frame) delete frame.thumbnailBase64;
+                });
+
+                restoreEditorUI();
+            });
+
+            event.target.value = '';
+        }
+
+        function addBlankFrame(position) {
+            if (position === 'before') {
+                state.leadingBlankFrames = (state.leadingBlankFrames || 0) + 1;
+                state.framesData.unshift({ isBlankFrame: true });
+            } else {
+                state.trailingBlankFrames = (state.trailingBlankFrames || 0) + 1;
+                state.framesData.push({ isBlankFrame: true });
+            }
+
+            updateEditorState();
+        }
+
+        function removeBlankFrame(position) {
+            if (position === 'before' && state.leadingBlankFrames > 0) {
+                state.leadingBlankFrames--;
+                state.framesData.shift();
+            }
+
+            if (position === 'after' && state.trailingBlankFrames > 0) {
+                state.trailingBlankFrames--;
+                state.framesData.pop();
+            }
+
+            updateEditorState();
+        }
+
+        function getFrameInfo(frameIndex) {
+            const before = state.leadingBlankFrames || 0;
+            const imageCount = state.imageFramesCount || Math.max(1, state.maxPossibleFrames - state.excludedFrames);
+
+            if (frameIndex < before) return { type: 'blank' };
+            if (frameIndex >= before + imageCount) return { type: 'blank' };
+
+            return { type: 'image', imageIndex: frameIndex - before };
         }
 
         function handleImportJSON(event) {
@@ -418,7 +543,9 @@
                     state.projectName = data.projectName;
                     state.originalDataUrl = data.originalDataUrl;
                     state.scale = data.scale; state.x = data.x; state.y = data.y;
-                    state.excludedFrames = data.excludedFrames || 0;
+                                        state.excludedFrames = data.excludedFrames || 0;
+                    state.leadingBlankFrames = data.leadingBlankFrames || 0;
+                    state.trailingBlankFrames = data.trailingBlankFrames || 0;
                     state.framesData = data.framesData || []; 
                     state.isRestoring = true;
                     const img = new Image();
@@ -476,14 +603,18 @@
             state.excludedFrames = parseInt(excludeSlider.value) || 0;
             document.getElementById('exclude-value').innerText = state.excludedFrames;
 
-            state.finalFramesCount = state.maxPossibleFrames - state.excludedFrames;
+                        state.imageFramesCount = state.maxPossibleFrames - state.excludedFrames;
+            state.finalFramesCount = (state.leadingBlankFrames || 0) + state.imageFramesCount + (state.trailingBlankFrames || 0);
             const totalActiveWidth = state.finalFramesCount * state.frameWidth;
 
             if (!state.framesData || state.framesData.length !== state.finalFramesCount) {
                 state.framesData = Array.from({ length: state.finalFramesCount }, (_, i) => state.framesData[i] || {});
             }
 
-            let minX = totalActiveWidth - scaledW; if (minX > 0) minX = 0;
+            document.getElementById('blank-before-value').innerText = state.leadingBlankFrames || 0;
+            document.getElementById('blank-after-value').innerText = state.trailingBlankFrames || 0;
+
+                        let minX = (state.imageFramesCount * state.frameWidth) - scaledW; if (minX > 0) minX = 0;
             const sliderX = document.getElementById('slider-x'); sliderX.min = minX; sliderX.max = 0;
             let minY = state.viewportHeight - scaledH; if (minY > 0) minY = 0;
             const sliderY = document.getElementById('slider-y'); sliderY.min = minY; sliderY.max = 0;
@@ -493,20 +624,22 @@
             state.y = Math.max(minY, Math.min(0, parseFloat(sliderY.value) || 0));
             sliderX.value = state.x; sliderY.value = state.y;
 
-            document.getElementById('preview-img').style.transform = `translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+                        document.getElementById('preview-img').style.transform = `translate(${state.x + ((state.leadingBlankFrames || 0) * state.frameWidth)}px, ${state.y}px) scale(${state.scale})`;
             document.getElementById('crop-area').style.width = `${totalActiveWidth}px`;
             
             const gridContainer = document.getElementById('grid-container');
             gridContainer.innerHTML = ''; 
 
-            for(let i = 0; i < state.finalFramesCount; i++) {
+                        for(let i = 0; i < state.finalFramesCount; i++) {
                 const frame = document.createElement('div');
+                const frameInfo = getFrameInfo(i);
                 frame.style.width = `${state.frameWidth}px`;
                 frame.style.height = `${state.viewportHeight}px`;
                 let borderClass = 'border-2 border-brand-yellow';
                 if (i > 0) borderClass += ' border-l-2 border-dashed border-l-brand-yellow/70';
-                
-                frame.className = `${borderClass} flex items-center justify-center bg-black/5 flex-shrink-0 relative group pointer-events-auto cursor-default`;
+
+                const frameBgClass = frameInfo.type === 'blank' ? 'bg-white' : 'bg-black/5';
+                frame.className = `${borderClass} flex items-center justify-center ${frameBgClass} flex-shrink-0 relative group pointer-events-auto cursor-default`;
                 
                 const thumbImg = document.createElement('img');
                 thumbImg.id = `thumb-img-${i}`;
@@ -527,23 +660,33 @@
 
                 const editBtn = document.createElement('button');
                 editBtn.className = 'absolute bottom-3 right-3 bg-brand-blue text-white py-1.5 px-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20 cursor-pointer shadow-md hover:bg-brand-bluedark flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider border border-white/20';
-                editBtn.innerHTML = `Modifica Testi`;
+                                editBtn.innerHTML = `EDIT SLIDE`;
                 editBtn.onclick = () => openAdvancedTextEditor(i);
                 
-                frame.appendChild(thumbImg);
+                                                frame.appendChild(thumbImg);
                 frame.appendChild(label);
                 frame.appendChild(editBtn);
                 gridContainer.appendChild(frame);
             }
         }
 
-                let previewTimeout = null;
-        const CUSTOM_FABRIC_PROPS = [
+                                var previewTimeout = null;
+        var CUSTOM_FABRIC_PROPS = [
             'customBgPadding',
             'customBgRadius',
             'customBarPosition',
             'customBarColor',
-            'customBarWidth'
+            'customBarWidth',
+            'customQuoteEnabled',
+            'customQuoteColor',
+            'customQuoteSize',
+            'isDecorBox',
+            'customBoxBarLeft',
+            'customBoxBarRight',
+            'customBoxBarTop',
+            'customBoxBarBottom',
+            'customBoxBarColor',
+            'customBoxBarWidth'
         ];
         
         window.debouncedSyncPreview = function() {
@@ -659,8 +802,8 @@
             if (thumbImg) thumbImg.src = dataUrl;
         };
 
-        let fCanvas = null;
-        let currentEditingFrameIndex = -1;
+                var fCanvas = null;
+        var currentEditingFrameIndex = -1;
 
         function initFabricCanvas() {
             if (fCanvas) return;
@@ -713,21 +856,28 @@
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
 
-            const sourceX = ((frameIndex * state.frameWidth) - state.x) / state.scale;
-            const sourceY = Math.abs(state.y) / state.scale;
-            const sourceW = state.frameWidth / state.scale;
-            const sourceH = state.viewportHeight / state.scale;
+                        const frameInfo = getFrameInfo(frameIndex);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, state.frameWidth, state.viewportHeight);
 
-            ctx.drawImage(state.imgObj, sourceX, sourceY, sourceW, sourceH, 0, 0, state.frameWidth, state.viewportHeight);
+            if (frameInfo.type === 'image') {
+                const sourceX = ((frameInfo.imageIndex * state.frameWidth) - state.x) / state.scale;
+                const sourceY = Math.abs(state.y) / state.scale;
+                const sourceW = state.frameWidth / state.scale;
+                const sourceH = state.viewportHeight / state.scale;
+
+                ctx.drawImage(state.imgObj, sourceX, sourceY, sourceW, sourceH, 0, 0, state.frameWidth, state.viewportHeight);
+            }
             
             fabric.Image.fromURL(tempCanvas.toDataURL('image/png'), function(img) {
                 fCanvas.setBackgroundImage(img, fCanvas.renderAll.bind(fCanvas));
             });
 
-            document.getElementById('modal-editor').classList.remove('hidden');
+                        document.getElementById('modal-editor').classList.remove('hidden');
             document.getElementById('modal-editor').classList.add('flex');
-            
-            document.getElementById('text-controls').classList.add('hidden');
+
+            enhanceEditorSidebar();
+            showSelectionPanels(null);
             
             if (state.framesData[frameIndex] && state.framesData[frameIndex].fabricJSON) {
                 fCanvas.loadFromJSON(state.framesData[frameIndex].fabricJSON, () => {
@@ -747,14 +897,16 @@
             document.getElementById('modal-editor').classList.remove('flex');
         };
 
-                        function configureTextboxObject(obj) {
+                                                function configureTextboxObject(obj) {
             if (!obj || obj.type !== 'textbox') return;
 
             obj.set({
                 lockUniScaling: false,
                 lockScalingY: true,
-                lockScalingFlip: true,
-                centeredScaling: false
+                                lockScalingFlip: true,
+                centeredScaling: false,
+                objectCaching: false,
+                fill: obj.fill || '#333333'
             });
 
             obj.setControlsVisibility({
@@ -776,15 +928,67 @@
                 });
             }
 
-            obj.set({
-                scaleY: 1
-            });
-
+            obj.set({ scaleY: 1 });
+            ensureBarTextGap(obj);
             obj.initDimensions();
             obj.setCoords();
         }
 
-                        let sidebarTextSelection = { start: 0, end: 0 };
+                function configureImageObject(obj) {
+            if (!obj || obj.type !== 'image') return;
+
+            obj.set({
+                lockUniScaling: true,
+                lockScalingFlip: true,
+                centeredScaling: false,
+                objectCaching: false
+            });
+
+            obj.setControlsVisibility({
+                mt: false,
+                mb: false,
+                ml: false,
+                mr: false,
+                mtr: true
+            });
+
+            obj.setCoords();
+        }
+
+        function configureDecorBoxObject(obj) {
+            if (!obj || obj.type !== 'rect' || !obj.isDecorBox) return;
+
+            obj.set({
+                objectCaching: false,
+                lockScalingFlip: true,
+                centeredScaling: false
+            });
+
+            obj.setControlsVisibility({
+                mt: true,
+                mb: true,
+                ml: true,
+                mr: true,
+                tl: true,
+                tr: true,
+                bl: true,
+                br: true,
+                mtr: true
+            });
+
+            obj.setCoords();
+        }
+
+                                var sidebarTextSelection = window.sidebarTextSelection || { start: 0, end: 0 };
+        window.sidebarTextSelection = sidebarTextSelection;
+        var GRANULAR_TEXT_PROPS = ['fill', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'underline', 'linethrough'];
+        var EXTRA_TEXT_FONTS = [
+            ['Helvetica Neue', 'Helvetica Neue'],
+            ['Aptos', 'Aptos'],
+            ['Segoe UI', 'Segoe UI'],
+            ['Trebuchet MS', 'Trebuchet MS'],
+            ['Verdana', 'Verdana']
+        ];
 
         function escapeHtml(str) {
             return String(str)
@@ -793,6 +997,185 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        function setAccordionState(button, open) {
+            const panel = button ? button.nextElementSibling : null;
+            if (!button || !panel) return;
+            panel.classList.toggle('hidden', !open);
+            button.querySelector('[data-accordion-icon]').innerText = open ? '-' : '+';
+        }
+
+        window.toggleAccordion = function(button) {
+            const panel = button.nextElementSibling;
+            setAccordionState(button, panel.classList.contains('hidden'));
+        };
+
+        function enhanceEditorSidebar() {
+            const sidebar = document.querySelector('#modal-editor .md\\:w-80');
+            if (!sidebar || sidebar.dataset.accordionReady) return;
+
+            sidebar.innerHTML = `
+                <div>
+                    <h3 class="font-bold text-brand-blue uppercase text-xs border-b-2 border-gray-300 pb-2 mb-3">Modelli Preimpostati</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="border border-gray-300 bg-white p-2 text-[10px] font-bold hover:border-brand-blue" onclick="addPreset('base')">Testo base</button>
+                        <button class="border border-gray-300 bg-white p-2 text-[10px] font-bold hover:border-brand-blue" onclick="addPreset('title')">Titolo grande</button>
+                        <button class="border border-gray-300 bg-brand-blue text-white p-2 text-[10px] font-bold hover:bg-brand-bluedark rounded-md" onclick="addPreset('label')">Etichetta</button>
+                        <button class="border border-gray-300 bg-gray-100 p-2 text-[10px] font-bold italic border-l-4 border-l-brand-yellow hover:bg-gray-200 flex items-center justify-center gap-2" onclick="addPreset('quote')">
+                            <span class="w-1 h-4 bg-brand-yellow block"></span> Citazione
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-300 pt-3">
+                                        <input id="overlay-image-upload" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" onchange="handleOverlayImageImport(this)">
+                    <button class="btn-secondary w-full text-[11px] py-2" onclick="document.getElementById('overlay-image-upload').click()">Importa PNG/JPG</button>
+                    <button class="btn-primary w-full text-[11px] py-2 mt-2" onclick="addDecorBox()">Aggiungi riquadro</button>
+                </div>
+
+                <div id="object-controls" class="hidden flex-col gap-2 border-t border-gray-300 pt-3">
+                    <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider bg-gray-200 p-2 border-l-4 border-brand-blue">Elemento selezionato</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="duplicateSelectedObject()">Duplica</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerH')">Centra H</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="sendSelectedBackward()">Dietro</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="bringSelectedForward()">Avanti</button>
+                    </div>
+                    <button class="text-red-600 text-[11px] font-bold uppercase py-1 hover:bg-red-50" onclick="deleteSelectedObject()">Elimina elemento</button>
+                </div>
+
+                                <div id="box-controls" class="hidden flex-col gap-3 border-t border-gray-300 pt-3">
+                    <div class="border border-gray-300 bg-white">
+                        <button class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-bold uppercase text-brand-blue bg-gray-100" onclick="toggleAccordion(this)">
+                            Riquadro <span data-accordion-icon>-</span>
+                        </button>
+                        <div class="p-3 space-y-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-600 mb-1">Colore sfondo</label>
+                                <input type="color" id="box-fill" value="#ffffff" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateDecorBoxMetric('fill', this.value)">
+                            </div>
+
+                            <div>
+                                <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                    <span>Opacita</span> <span id="val-box-opacity">100</span>
+                                </label>
+                                <input type="range" id="rng-box-opacity" min="0" max="100" step="1" value="100" oninput="updateDecorBoxMetric('opacity', this.value)">
+                            </div>
+
+                            <div>
+                                <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                    <span>Stondamento</span> <span id="val-box-radius">12</span>
+                                </label>
+                                <input type="range" id="rng-box-radius" min="0" max="80" step="1" value="12" oninput="updateDecorBoxMetric('radius', this.value)">
+                            </div>
+
+                            <div class="bg-blue-50 p-2 border border-blue-200 rounded">
+                                <h5 class="text-[10px] font-bold text-brand-blue mb-2 uppercase">Barre decorative</h5>
+                                <div class="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 mb-2">
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="box-bar-left" onchange="updateDecorBoxMetric('customBoxBarLeft', this.checked)"> Sinistra</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="box-bar-right" onchange="updateDecorBoxMetric('customBoxBarRight', this.checked)"> Destra</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="box-bar-top" onchange="updateDecorBoxMetric('customBoxBarTop', this.checked)"> Alto</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="box-bar-bottom" onchange="updateDecorBoxMetric('customBoxBarBottom', this.checked)"> Basso</label>
+                                </div>
+
+                                <label class="block text-[10px] font-bold text-gray-600 mb-1">Colore barre</label>
+                                <input type="color" id="box-bar-color" value="#eddc01" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateDecorBoxMetric('customBoxBarColor', this.value)">
+
+                                <label class="flex justify-between text-[10px] font-bold text-gray-600 mb-1 mt-2">
+                                    <span>Spessore barre</span> <span id="val-box-barwidth">8</span>
+                                </label>
+                                <input type="range" id="rng-box-barwidth" min="1" max="60" step="1" value="8" oninput="updateDecorBoxMetric('customBoxBarWidth', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="text-controls" class="hidden flex-col gap-3 opacity-50 transition-opacity" style="opacity: 1;">
+                    <div class="border border-gray-300 bg-white">
+                        <button class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-bold uppercase text-brand-blue bg-gray-100" onclick="toggleAccordion(this)">
+                            Contenuto <span data-accordion-icon>-</span>
+                        </button>
+                        <div class="p-3">
+                            <label class="block text-[11px] font-bold text-brand-blue mb-1 uppercase tracking-wider">Contenuto Testo</label>
+                                                        <div id="text-content-input" contenteditable="true" class="w-full min-h-[84px] border-2 border-brand-yellow p-2 text-sm bg-gray-100 rounded-md outline-none whitespace-pre-wrap break-words" oninput="updateSelectedText(this.innerText)" onkeyup="storeSidebarTextSelection()" onmouseup="storeSidebarTextSelection()" onblur="storeSidebarTextSelection()"></div>
+                            <p class="text-[9px] text-gray-500 leading-tight mt-1">Seleziona parole o frasi e applica gli stili dalla sezione Testo.</p>
+                        </div>
+                    </div>
+
+                    <div class="border border-gray-300 bg-white">
+                        <button class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-bold uppercase text-brand-blue bg-gray-100" onclick="toggleAccordion(this)">
+                            Testo <span data-accordion-icon>-</span>
+                        </button>
+                        <div class="p-3 space-y-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-600 mb-1">Font Family</label>
+                                <select id="font-family" class="w-full border border-gray-300 p-1.5 text-sm bg-white" onchange="updateSelectedObject('fontFamily', this.value)">
+                                                                        <option value="Montserrat">Montserrat (standard)</option>
+                                    <option value="Inter">Inter</option>
+                                    <option value="Nunito">Nunito</option>
+                                    <option value="Helvetica Neue">Helvetica Neue</option>
+                                    <option value="Aptos">Aptos</option>
+                                    <option value="Segoe UI">Segoe UI</option>
+                                    <option value="Trebuchet MS">Trebuchet MS</option>
+                                    <option value="Verdana">Verdana</option>
+                                    <option value="Arial">Arial</option>
+                                    <option value="Times New Roman">Times New Roman</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                    <span>Dimensione Font</span> <span id="val-fontsize">24</span>
+                                </label>
+                                <input type="range" id="rng-fontsize" min="8" max="96" step="1" value="24" oninput="updateTextMetric('fontSize', this.value)">
+                            </div>
+
+                            <div>
+                                <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                    <span>Interlinea</span> <span id="val-lineheight">1.2</span>
+                                </label>
+                                <input type="range" id="rng-lineheight" min="0.8" max="2.5" step="0.1" value="1.2" oninput="updateTextMetric('lineHeight', this.value)">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-600 mb-1">Colore Testo</label>
+                                <input type="color" id="text-color" value="#333333" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateSelectedObject('fill', this.value)">
+                                <div class="flex gap-1.5 mt-1">
+                                    <button class="w-4 h-4 rounded-full bg-[#111111] border border-gray-300" onclick="applyQuickColor('#111111', 'fill', 'text-color')" title="Nero"></button>
+                                    <button class="w-4 h-4 rounded-full bg-[#333333] border border-gray-300" onclick="applyQuickColor('#333333', 'fill', 'text-color')" title="Grigio Scuro"></button>
+                                    <button class="w-4 h-4 rounded-full bg-[#0146bc] border border-gray-300" onclick="applyQuickColor('#0146bc', 'fill', 'text-color')" title="Blu Poste"></button>
+                                    <button class="w-4 h-4 rounded-full bg-[#eddc01] border border-gray-300" onclick="applyQuickColor('#eddc01', 'fill', 'text-color')" title="Giallo Poste"></button>
+                                    <button class="w-4 h-4 rounded-full bg-[#ffffff] border border-gray-300" onclick="applyQuickColor('#ffffff', 'fill', 'text-color')" title="Bianco"></button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-1">
+                                <button class="text-xs border border-gray-300 p-1 hover:bg-gray-200 bg-white" onclick="updateSelectedObject('textAlign', 'left')">Sx</button>
+                                <button class="text-xs border border-gray-300 p-1 hover:bg-gray-200 bg-white" onclick="updateSelectedObject('textAlign', 'center')">Ctr</button>
+                                <button class="text-xs border border-gray-300 p-1 hover:bg-gray-200 bg-white" onclick="updateSelectedObject('textAlign', 'right')">Dx</button>
+                                <button class="text-xs border border-gray-300 p-1 hover:bg-gray-200 bg-white font-bold" onclick="toggleTextWeight()">B</button>
+                                <button class="text-xs border border-gray-300 p-1 hover:bg-gray-200 bg-white italic" onclick="toggleTextItalic()">I</button>
+                                <button class="text-xs border border-gray-300 p-1 hover:bg-gray-200 bg-white underline" onclick="toggleTextUnderline()">U</button>
+                                <button class="text-xs border border-gray-300 p-1 hover:bg-gray-200 bg-white line-through" onclick="toggleTextStrike()">S</button>
+                                <button class="text-[10px] border border-gray-300 p-1 hover:bg-gray-200 bg-white col-span-2" onclick="clearSelectedTextStyle()">Reset stile selezione</button>
+                            </div>
+                        </div>
+                    </div>
+
+                                        <div class="border border-gray-300 bg-white">
+                        <button class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-bold uppercase text-brand-blue bg-gray-100" onclick="toggleAccordion(this)">
+                            Composizione <span data-accordion-icon>+</span>
+                        </button>
+                        <div class="p-3 space-y-2 hidden">
+                            <button class="btn-primary w-full text-[11px] py-2" onclick="addDecorBox()">Aggiungi riquadro separato</button>
+                            <p class="text-[9px] text-gray-500 leading-tight">Per sfondi, barre e cornici usa un riquadro separato e porta il testo sopra.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            sidebar.dataset.accordionReady = 'true';
         }
 
         function getEditableSelectionRange(el) {
@@ -820,22 +1203,43 @@
             sidebarTextSelection = getEditableSelectionRange(input);
         };
 
-        function getTextboxStyleAt(obj, absoluteIndex) {
-            const lines = (obj.text || '').split('\n');
+        function getTextPositionAt(text, absoluteIndex) {
+            const lines = (text || '').split('\n');
             let cursor = 0;
 
             for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
                 const lineLength = lines[lineIndex].length;
 
                 if (absoluteIndex >= cursor && absoluteIndex < cursor + lineLength) {
-                    const charIndex = absoluteIndex - cursor;
-                    return (obj.styles && obj.styles[lineIndex] && obj.styles[lineIndex][charIndex]) || {};
+                    return { lineIndex, charIndex: absoluteIndex - cursor };
                 }
 
                 cursor += lineLength + 1;
             }
 
-            return {};
+            return null;
+        }
+
+        function getTextboxStyleAt(obj, absoluteIndex) {
+            const pos = getTextPositionAt(obj.text || '', absoluteIndex);
+            if (!pos) return {};
+            return (obj.styles && obj.styles[pos.lineIndex] && obj.styles[pos.lineIndex][pos.charIndex]) || {};
+        }
+
+        function setTextboxStyleAt(obj, absoluteIndex, style) {
+            const pos = getTextPositionAt(obj.text || '', absoluteIndex);
+            if (!pos || !style || !Object.keys(style).length) return;
+
+            if (!obj.styles) obj.styles = {};
+            if (!obj.styles[pos.lineIndex]) obj.styles[pos.lineIndex] = {};
+            obj.styles[pos.lineIndex][pos.charIndex] = { ...style };
+        }
+
+        function getTextDecoration(style, obj) {
+            const decorations = [];
+            if (style.underline || obj.underline) decorations.push('underline');
+            if (style.linethrough || obj.linethrough) decorations.push('line-through');
+            return decorations.length ? decorations.join(' ') : 'none';
         }
 
         function renderSidebarTextEditor(obj) {
@@ -854,11 +1258,14 @@
                 }
 
                 const style = getTextboxStyleAt(obj, i);
-                const color = style.fill || obj.fill || '#000000';
+                const color = style.fill || obj.fill || '#333333';
                 const weight = style.fontWeight || obj.fontWeight || 'normal';
                 const fontStyle = style.fontStyle || obj.fontStyle || 'normal';
+                                const fontFamily = style.fontFamily || obj.fontFamily || 'Montserrat';
+                const fontSize = style.fontSize || obj.fontSize || 24;
+                const decoration = getTextDecoration(style, obj);
 
-                html += `<span style="color:${color};font-weight:${weight};font-style:${fontStyle};">${escapeHtml(char)}</span>`;
+                html += `<span style="color:${color};font-weight:${weight};font-style:${fontStyle};font-family:${fontFamily};font-size:${fontSize}px;text-decoration:${decoration};">${escapeHtml(char)}</span>`;
             }
 
             input.innerHTML = html || '<br>';
@@ -885,6 +1292,27 @@
             return null;
         }
 
+        function getSelectionPreviewStyle(obj) {
+            const range = getActiveTextStyleRange(obj);
+            if (range && range.start !== range.end) {
+                return obj.getSelectionStyles(range.start, range.start + 1)[0] || {};
+            }
+            return {};
+        }
+
+                function normalizeBarAlignment(obj) {
+            if (!obj || obj.type !== 'textbox') return;
+
+            const barPosition = obj.customBarPosition || 'none';
+            if ((barPosition === 'left' || barPosition === 'right') && obj.textAlign === barPosition) {
+                obj.set('textAlign', 'center');
+            }
+        }
+
+        function ensureBarTextGap(obj) {
+            normalizeBarAlignment(obj);
+        }
+
         function applySelectedTextboxStyle(obj, styleObj) {
             const range = getActiveTextStyleRange(obj);
 
@@ -896,142 +1324,553 @@
                 obj.set(styleObj);
             }
 
+            ensureBarTextGap(obj);
             obj.dirty = true;
             if (!obj.isEditing) obj.initDimensions();
             obj.setCoords();
+            renderSidebarTextEditor(obj);
             fCanvas.requestRenderAll();
             debouncedSyncPreview();
         }
 
-        window.addPreset = function(type) {
-            // Nota: editable è tornato TRUE per consentire stile granulare
-            let options = {
-                left: 50, top: 50, width: 300, fontFamily: 'Montserrat', textAlign: 'center', editable: true,
-                lockUniScaling: true, lockScalingFlip: true
-            };
+                function addTextboxObject(options) {
+            const text = new fabric.Textbox(options.text || 'Testo', {
+                left: 50,
+                top: 50,
+                width: 300,
+                fontFamily: 'Montserrat',
+                textAlign: 'center',
+                editable: true,
+                lockUniScaling: true,
+                lockScalingFlip: true,
+                fill: '#333333',
+                lineHeight: 1,
+                fontWeight: 'normal',
+                backgroundColor: '',
+                ...options
+            });
 
-            if (type === 'title') {
-                options = { ...options, text: "TITOLO IN EVIDENZA", fontSize: 36, fontWeight: 'bold', fill: '#0146bc', backgroundColor: '' };
-            } else if (type === 'label') {
-                options = { ...options, text: "Scrivi Qui", fontSize: 24, fill: '#ffffff', backgroundColor: '#0146bc', customBgPadding: 15, customBgRadius: 12 };
-            } else if (type === 'quote') {
-                options = { ...options, text: "\"Una citazione molto importante che fa riflettere.\"", fontSize: 20, fontStyle: 'italic', fill: '#333333', backgroundColor: '#ffffff', customBgPadding: 20, customBgRadius: 8, customBarPosition: 'left', customBarColor: '#eddc01', customBarWidth: 8 };
+            configureTextboxObject(text);
+            fCanvas.add(text);
+            return text;
+        }
+
+        function addDecorBoxObject(options) {
+            const box = new fabric.Rect({
+                left: fCanvas.getWidth() / 2,
+                top: fCanvas.getHeight() / 2,
+                originX: 'center',
+                originY: 'center',
+                width: Math.min(300, fCanvas.getWidth() * 0.78),
+                height: 110,
+                fill: '#ffffff',
+                opacity: 0.92,
+                rx: 12,
+                ry: 12,
+                isDecorBox: true,
+                customBoxBarLeft: false,
+                customBoxBarRight: false,
+                customBoxBarTop: false,
+                customBoxBarBottom: false,
+                customBoxBarColor: '#eddc01',
+                customBoxBarWidth: 8,
+                ...options
+            });
+
+            configureDecorBoxObject(box);
+            fCanvas.add(box);
+            return box;
+        }
+
+        window.addPreset = function(type) {
+            if (type === 'label') {
+                const cx = fCanvas.getWidth() / 2;
+                const cy = fCanvas.getHeight() / 2;
+
+                const box = addDecorBoxObject({
+                    left: cx,
+                    top: cy,
+                    width: 260,
+                    height: 64,
+                    fill: '#0146bc',
+                    opacity: 1,
+                    rx: 12,
+                    ry: 12
+                });
+
+                const text = addTextboxObject({
+                    text: 'Scrivi Qui',
+                    left: cx,
+                    top: cy - 14,
+                    originX: 'center',
+                    originY: 'center',
+                    width: 220,
+                    fontSize: 24,
+                    fill: '#ffffff',
+                    textAlign: 'center',
+                    lineHeight: 1,
+                    backgroundColor: ''
+                });
+
+                fCanvas.sendToBack(box);
+                fCanvas.setActiveObject(text);
+                fCanvas.requestRenderAll();
+                syncUIControls();
+                syncPreview();
+                return;
             }
 
-            const text = new fabric.Textbox(options.text, options);
-            configureTextboxObject(text);
-            fCanvas.add(text); fCanvas.centerObject(text); fCanvas.setActiveObject(text);
+            if (type === 'quote') {
+                const cx = fCanvas.getWidth() / 2;
+                const cy = fCanvas.getHeight() / 2;
+
+                const box = addDecorBoxObject({
+                    left: cx,
+                    top: cy,
+                    width: Math.min(330, fCanvas.getWidth() * 0.86),
+                    height: 150,
+                    fill: '#ffffff',
+                    opacity: 0.96,
+                    rx: 16,
+                    ry: 16,
+                    customBoxBarLeft: true,
+                    customBoxBarColor: '#eddc01',
+                    customBoxBarWidth: 8
+                });
+
+                const text = addTextboxObject({
+                    text: 'Una frase chiave,\nchiara e memorabile.',
+                    left: cx,
+                    top: cy + 2,
+                    originX: 'center',
+                    originY: 'center',
+                    width: Math.min(245, fCanvas.getWidth() * 0.64),
+                    fontSize: 19,
+                    fontStyle: 'italic',
+                    fill: '#333333',
+                    textAlign: 'center',
+                    lineHeight: 1.18,
+                    backgroundColor: ''
+                });
+
+                const openQuote = addTextboxObject({
+                    text: '“',
+                    left: cx - Math.min(138, fCanvas.getWidth() * 0.34),
+                    top: cy - 48,
+                    originX: 'center',
+                    originY: 'center',
+                    width: 44,
+                    fontSize: 58,
+                    fontWeight: 'bold',
+                    fill: '#eddc01',
+                    textAlign: 'center',
+                    lineHeight: 1,
+                    backgroundColor: ''
+                });
+
+                const closeQuote = addTextboxObject({
+                    text: '”',
+                    left: cx + Math.min(138, fCanvas.getWidth() * 0.34),
+                    top: cy + 56,
+                    originX: 'center',
+                    originY: 'center',
+                    width: 44,
+                    fontSize: 58,
+                    fontWeight: 'bold',
+                    fill: '#eddc01',
+                    textAlign: 'center',
+                    lineHeight: 1,
+                    backgroundColor: ''
+                });
+
+                fCanvas.sendToBack(box);
+                fCanvas.bringForward(openQuote);
+                fCanvas.bringForward(closeQuote);
+                fCanvas.setActiveObject(text);
+                fCanvas.requestRenderAll();
+                syncUIControls();
+                syncPreview();
+                return;
+            }
+
+            let options = {
+                text: 'Testo',
+                left: 50,
+                top: 50,
+                width: 300,
+                fontFamily: 'Montserrat',
+                textAlign: 'center',
+                editable: true,
+                lockUniScaling: true,
+                lockScalingFlip: true,
+                fill: '#333333',
+                lineHeight: 1,
+                fontWeight: 'normal',
+                backgroundColor: ''
+            };
+
+            if (type === 'base') {
+                options = { ...options, text: 'Testo base', fontSize: 20, fontFamily: 'Montserrat', fill: '#333333', fontWeight: 'normal', lineHeight: 1 };
+            } else if (type === 'title') {
+                options = { ...options, text: 'TITOLO IN EVIDENZA', fontSize: 36, fontWeight: 'bold', fill: '#0146bc', lineHeight: 1.1 };
+            }
+
+            const text = addTextboxObject(options);
+            fCanvas.centerObject(text);
+            fCanvas.setActiveObject(text);
+            syncUIControls();
             syncPreview();
         };
 
-        window.applyQuickColor = function(hex, prop, inputId) {
+                window.applyQuickColor = function(hex, prop, inputId) {
             const el = document.getElementById(inputId);
             if(el) el.value = hex;
             updateSelectedObject(prop, hex);
         };
 
-        function syncUIControls() { 
+        window.addDecorBox = function() {
+            const box = new fabric.Rect({
+                left: fCanvas.getWidth() / 2,
+                top: fCanvas.getHeight() / 2,
+                originX: 'center',
+                originY: 'center',
+                width: Math.min(300, fCanvas.getWidth() * 0.78),
+                height: 110,
+                fill: '#ffffff',
+                opacity: 0.92,
+                rx: 12,
+                ry: 12,
+                isDecorBox: true,
+                customBoxBarLeft: true,
+                customBoxBarRight: false,
+                customBoxBarTop: false,
+                customBoxBarBottom: false,
+                customBoxBarColor: '#eddc01',
+                customBoxBarWidth: 8
+            });
+
+            configureDecorBoxObject(box);
+            fCanvas.add(box);
+            fCanvas.sendBackwards(box);
+            fCanvas.setActiveObject(box);
+            fCanvas.requestRenderAll();
+            syncUIControls();
+            syncPreview();
+        };
+
+        window.updateDecorBoxMetric = function(property, value) {
             const obj = fCanvas.getActiveObject();
-            if(obj && obj.type === 'textbox') {
-                configureTextboxObject(obj);
+            if (!obj || obj.type !== 'rect' || !obj.isDecorBox) return;
 
-                document.getElementById('text-controls').classList.remove('hidden');
-                document.getElementById('text-controls').classList.add('flex');
-                
-                                renderSidebarTextEditor(obj);
+            if (property === 'opacity') {
+                const opacity = Math.max(0, Math.min(100, parseFloat(value) || 0)) / 100;
+                obj.set('opacity', opacity);
+                document.getElementById('val-box-opacity').innerText = Math.round(opacity * 100);
+            } else if (property === 'radius') {
+                const radius = Math.max(0, parseFloat(value) || 0);
+                obj.set({ rx: radius, ry: radius });
+                document.getElementById('val-box-radius').innerText = radius;
+            } else if (property === 'customBoxBarWidth') {
+                const width = Math.max(1, parseFloat(value) || 1);
+                obj.set(property, width);
+                document.getElementById('val-box-barwidth').innerText = width;
+            } else {
+                obj.set(property, value);
+            }
 
-                                document.getElementById('font-family').value = obj.fontFamily || 'Inter';
-                document.getElementById('rng-fontsize').value = obj.fontSize || 24;
-                document.getElementById('val-fontsize').innerText = obj.fontSize || 24;
-                document.getElementById('text-color').value = obj.fill || '#000000';
-                document.getElementById('bg-color').value = obj.backgroundColor || '#ffffff';
-                
-                document.getElementById('bar-position').value = obj.customBarPosition || 'none';
-                document.getElementById('bar-color').value = obj.customBarColor || '#0146bc';
-                
-                document.getElementById('rng-barwidth').value = obj.customBarWidth || 8;
-                document.getElementById('val-barwidth').innerText = obj.customBarWidth || 8;
+            obj.dirty = true;
+            obj.setCoords();
+            fCanvas.requestRenderAll();
+            debouncedSyncPreview();
+        };
 
-                document.getElementById('rng-lineheight').value = obj.lineHeight || 1.16;
-                document.getElementById('val-lineheight').innerText = obj.lineHeight || 1.16;
-                
-                document.getElementById('rng-padding').value = obj.customBgPadding || 0;
-                document.getElementById('val-padding').innerText = obj.customBgPadding || 0;
-                
-                document.getElementById('rng-radius').value = obj.customBgRadius || 0;
-                document.getElementById('val-radius').innerText = obj.customBgRadius || 0;
+                function showSelectionPanels(kind) {
+            const textControls = document.getElementById('text-controls');
+            const objectControls = document.getElementById('object-controls');
+            const boxControls = document.getElementById('box-controls');
+
+            if (objectControls) {
+                objectControls.classList.toggle('hidden', !kind);
+                objectControls.classList.toggle('flex', !!kind);
+            }
+
+            if (textControls) {
+                textControls.classList.toggle('hidden', kind !== 'textbox');
+                textControls.classList.toggle('flex', kind === 'textbox');
+            }
+
+            if (boxControls) {
+                boxControls.classList.toggle('hidden', kind !== 'decorbox');
+                boxControls.classList.toggle('flex', kind === 'decorbox');
             }
         }
 
-                window.updateSelectedText = function(newText) {
+        function syncUIControls() {
+            enhanceEditorSidebar();
+
+            const obj = fCanvas.getActiveObject();
+            if (!obj) {
+                showSelectionPanels(null);
+                return;
+            }
+
+            if (obj.type === 'textbox') {
+                configureTextboxObject(obj);
+                showSelectionPanels('textbox');
+
+                renderSidebarTextEditor(obj);
+
+                const previewStyle = getSelectionPreviewStyle(obj);
+                                document.getElementById('font-family').value = previewStyle.fontFamily || obj.fontFamily || 'Montserrat';
+                document.getElementById('rng-fontsize').value = previewStyle.fontSize || obj.fontSize || 24;
+                document.getElementById('val-fontsize').innerText = previewStyle.fontSize || obj.fontSize || 24;
+                document.getElementById('text-color').value = previewStyle.fill || obj.fill || '#333333';
+                                document.getElementById('rng-lineheight').value = obj.lineHeight || 1;
+                document.getElementById('val-lineheight').innerText = obj.lineHeight || 1;
+                return;
+            }
+
+                        if (obj.type === 'rect' && obj.isDecorBox) {
+                configureDecorBoxObject(obj);
+                showSelectionPanels('decorbox');
+
+                document.getElementById('box-fill').value = obj.fill || '#ffffff';
+                document.getElementById('rng-box-opacity').value = Math.round((obj.opacity == null ? 1 : obj.opacity) * 100);
+                document.getElementById('val-box-opacity').innerText = Math.round((obj.opacity == null ? 1 : obj.opacity) * 100);
+                document.getElementById('rng-box-radius').value = obj.rx || 0;
+                document.getElementById('val-box-radius').innerText = obj.rx || 0;
+
+                document.getElementById('box-bar-left').checked = !!obj.customBoxBarLeft;
+                document.getElementById('box-bar-right').checked = !!obj.customBoxBarRight;
+                document.getElementById('box-bar-top').checked = !!obj.customBoxBarTop;
+                document.getElementById('box-bar-bottom').checked = !!obj.customBoxBarBottom;
+                document.getElementById('box-bar-color').value = obj.customBoxBarColor || '#eddc01';
+                document.getElementById('rng-box-barwidth').value = obj.customBoxBarWidth || 8;
+                document.getElementById('val-box-barwidth').innerText = obj.customBoxBarWidth || 8;
+                return;
+            }
+
+            if (obj.type === 'image') {
+                configureImageObject(obj);
+                showSelectionPanels('image');
+            }
+        }
+
+        window.updateSelectedText = function(newText) {
             const obj = fCanvas.getActiveObject();
             if (obj && obj.type === 'textbox') {
                 newText = newText.replace(/\n$/, '');
+
+                const oldText = obj.text || '';
+                const styleSnapshot = [];
+                for (let i = 0; i < oldText.length; i++) {
+                    styleSnapshot[i] = { ...getTextboxStyleAt(obj, i) };
+                }
+
                 obj.set('text', newText);
+                obj.styles = {};
+                for (let i = 0; i < Math.min(newText.length, styleSnapshot.length); i++) {
+                    setTextboxStyleAt(obj, i, styleSnapshot[i]);
+                }
+
                 obj.dirty = true;
                 if (!obj.isEditing) obj.initDimensions();
                 obj.setCoords();
                 configureTextboxObject(obj);
                 storeSidebarTextSelection();
-                fCanvas.requestRenderAll(); 
-                debouncedSyncPreview(); 
+                fCanvas.requestRenderAll();
+                debouncedSyncPreview();
             }
         };
 
-        // GESTIONE GRANULARE DEGLI STILI 
         window.updateSelectedObject = function(property, value) {
             const obj = fCanvas.getActiveObject();
-            if (obj && obj.type === 'textbox') { 
-                let styleObj = {};
-                styleObj[property] = value;
-                applySelectedTextboxStyle(obj, styleObj);
+            if (!obj) return;
+
+            if (obj.type === 'textbox') {
+                if (property === 'fill' && !value) value = '#333333';
+
+                if (GRANULAR_TEXT_PROPS.includes(property)) {
+                    const styleObj = {};
+                    styleObj[property] = value;
+                    applySelectedTextboxStyle(obj, styleObj);
+                    syncUIControls();
+                    return;
+                }
+
+                obj.set(property, value);
+                ensureBarTextGap(obj);
+                obj.dirty = true;
+                if (!obj.isEditing) obj.initDimensions();
+                obj.setCoords();
+                fCanvas.requestRenderAll();
+                syncUIControls();
+                debouncedSyncPreview();
             }
         };
 
         window.toggleTextWeight = function() {
             const obj = fCanvas.getActiveObject();
-            if(obj && obj.type === 'textbox') { 
-                                const range = getActiveTextStyleRange(obj);
-                const selectionStyle = range
-                    ? obj.getSelectionStyles(range.start, range.start + 1)[0] || {}
-                    : {};
+            if(obj && obj.type === 'textbox') {
+                const selectionStyle = getSelectionPreviewStyle(obj);
                 const currentWeight = selectionStyle.fontWeight || obj.fontWeight;
                 const newVal = currentWeight === 'bold' ? 'normal' : 'bold';
                 applySelectedTextboxStyle(obj, { fontWeight: newVal });
+                syncUIControls();
             }
         };
 
         window.toggleTextItalic = function() {
             const obj = fCanvas.getActiveObject();
-            if(obj && obj.type === 'textbox') { 
-                                const range = getActiveTextStyleRange(obj);
-                const selectionStyle = range
-                    ? obj.getSelectionStyles(range.start, range.start + 1)[0] || {}
-                    : {};
+            if(obj && obj.type === 'textbox') {
+                const selectionStyle = getSelectionPreviewStyle(obj);
                 const currentStyle = selectionStyle.fontStyle || obj.fontStyle;
                 const newVal = currentStyle === 'italic' ? 'normal' : 'italic';
                 applySelectedTextboxStyle(obj, { fontStyle: newVal });
+                syncUIControls();
+            }
+        };
+
+        window.toggleTextUnderline = function() {
+            const obj = fCanvas.getActiveObject();
+            if(obj && obj.type === 'textbox') {
+                const selectionStyle = getSelectionPreviewStyle(obj);
+                applySelectedTextboxStyle(obj, { underline: !(selectionStyle.underline || obj.underline) });
+                syncUIControls();
+            }
+        };
+
+        window.toggleTextStrike = function() {
+            const obj = fCanvas.getActiveObject();
+            if(obj && obj.type === 'textbox') {
+                const selectionStyle = getSelectionPreviewStyle(obj);
+                applySelectedTextboxStyle(obj, { linethrough: !(selectionStyle.linethrough || obj.linethrough) });
+                syncUIControls();
+            }
+        };
+
+        window.clearSelectedTextStyle = function() {
+            const obj = fCanvas.getActiveObject();
+            if(obj && obj.type === 'textbox') {
+                applySelectedTextboxStyle(obj, {
+                    fill: obj.fill || '#333333',
+                                        fontFamily: obj.fontFamily || 'Montserrat',
+                    fontSize: obj.fontSize || 24,
+                    fontWeight: obj.fontWeight || 'normal',
+                    fontStyle: obj.fontStyle || 'normal',
+                    underline: false,
+                    linethrough: false
+                });
+                syncUIControls();
             }
         };
 
         window.updateTextMetric = function(property, value) {
             const obj = fCanvas.getActiveObject();
             if (obj && obj.type === 'textbox') {
-                const numVal = (property === 'customBarPosition' || property === 'customBarColor') ? value : parseFloat(value);
+                                const stringProps = ['customBarPosition', 'customBarColor', 'customQuoteColor'];
+                const numVal = property === 'customQuoteEnabled'
+                    ? !!value
+                    : stringProps.includes(property)
+                        ? value
+                        : parseFloat(value);
+
+                if(property === 'fontSize') {
+                    document.getElementById('val-fontsize').innerText = numVal;
+                    applySelectedTextboxStyle(obj, { fontSize: numVal });
+                    syncUIControls();
+                    return;
+                }
+
                 obj.set(property, numVal);
-                
+                ensureBarTextGap(obj);
+
                 if(property === 'lineHeight') document.getElementById('val-lineheight').innerText = numVal;
-                if(property === 'customBgPadding') document.getElementById('val-padding').innerText = numVal;
+                if(property === 'customBgPadding') document.getElementById('val-padding').innerText = obj.customBgPadding || numVal;
                 if(property === 'customBgRadius') document.getElementById('val-radius').innerText = numVal;
                                 if(property === 'customBarWidth') document.getElementById('val-barwidth').innerText = numVal;
-                if(property === 'fontSize') document.getElementById('val-fontsize').innerText = numVal;
-                
+                if(property === 'customQuoteSize') {
+                    const quoteSizeValue = document.getElementById('val-quotesize');
+                    if (quoteSizeValue) quoteSizeValue.innerText = numVal;
+                }
+
                 obj.dirty = true;
                 obj.initDimensions();
                 obj.setCoords();
                 fCanvas.requestRenderAll();
+                syncUIControls();
                 debouncedSyncPreview();
             }
+        };
+
+        window.handleOverlayImageImport = function(input) {
+            const file = input && input.files && input.files[0];
+            if (!file || !fCanvas) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                fabric.Image.fromURL(e.target.result, function(img) {
+                    const maxW = fCanvas.getWidth() * 0.72;
+                    const maxH = fCanvas.getHeight() * 0.72;
+                    const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+
+                    img.set({
+                        left: fCanvas.getWidth() / 2,
+                        top: fCanvas.getHeight() / 2,
+                        originX: 'center',
+                        originY: 'center',
+                        scaleX: scale,
+                        scaleY: scale
+                    });
+
+                    configureImageObject(img);
+                    fCanvas.add(img);
+                    fCanvas.setActiveObject(img);
+                    fCanvas.requestRenderAll();
+                    syncUIControls();
+                    syncPreview();
+                });
+            };
+            reader.readAsDataURL(file);
+            input.value = '';
+        };
+
+        window.duplicateSelectedObject = function() {
+            const obj = fCanvas.getActiveObject();
+            if (!obj) return;
+
+            obj.clone(function(clone) {
+                clone.set({
+                    left: (obj.left || 0) + 24,
+                    top: (obj.top || 0) + 24,
+                    evented: true
+                });
+
+                if (clone.type === 'textbox') configureTextboxObject(clone);
+                if (clone.type === 'image') configureImageObject(clone);
+
+                fCanvas.add(clone);
+                fCanvas.setActiveObject(clone);
+                fCanvas.requestRenderAll();
+                syncUIControls();
+                syncPreview();
+            }, CUSTOM_FABRIC_PROPS);
+        };
+
+        window.bringSelectedForward = function() {
+            const obj = fCanvas.getActiveObject();
+            if (!obj) return;
+            fCanvas.bringForward(obj);
+            fCanvas.requestRenderAll();
+            syncPreview();
+        };
+
+        window.sendSelectedBackward = function() {
+            const obj = fCanvas.getActiveObject();
+            if (!obj) return;
+            fCanvas.sendBackwards(obj);
+            fCanvas.requestRenderAll();
+            syncPreview();
         };
 
         window.alignObject = function(mode) {
@@ -1039,14 +1878,19 @@
             if(obj) {
                 if(mode === 'centerH') fCanvas.viewportCenterObjectH(obj);
                 if(mode === 'centerV') fCanvas.viewportCenterObjectV(obj);
-                obj.setCoords(); fCanvas.requestRenderAll();
+                obj.setCoords();
+                fCanvas.requestRenderAll();
                 syncPreview();
             }
         };
 
-        window.deleteSelectedObject = function() {
+                window.deleteSelectedObject = function() {
             const obj = fCanvas.getActiveObject();
-            if (obj) { fCanvas.remove(obj); document.getElementById('text-controls').classList.add('hidden'); syncPreview(); }
+            if (obj) {
+                fCanvas.remove(obj);
+                showSelectionPanels(null);
+                syncPreview();
+            }
         };
 
         // --- ESPORTAZIONE AD ALTA RISOLUZIONE VETTORIALE ---
@@ -1070,11 +1914,16 @@
                 ctx.clearRect(0, 0, targetW, targetH);
                 ctx.fillStyle = "white"; ctx.fillRect(0, 0, targetW, targetH);
 
-                const framePreviewX = i * state.frameWidth;
-                const sourceX = (framePreviewX - state.x) / state.scale; const sourceY = Math.abs(state.y) / state.scale;
-                const sourceW = state.frameWidth / state.scale; const sourceH = state.viewportHeight / state.scale;
+                                const frameInfo = getFrameInfo(i);
 
-                ctx.drawImage(state.imgObj, sourceX, sourceY, sourceW, sourceH, 0, 0, targetW, targetH);
+                if (frameInfo.type === 'image') {
+                    const sourceX = ((frameInfo.imageIndex * state.frameWidth) - state.x) / state.scale;
+                    const sourceY = Math.abs(state.y) / state.scale;
+                    const sourceW = state.frameWidth / state.scale;
+                    const sourceH = state.viewportHeight / state.scale;
+
+                    ctx.drawImage(state.imgObj, sourceX, sourceY, sourceW, sourceH, 0, 0, targetW, targetH);
+                }
 
                 if (state.framesData[i] && state.framesData[i].fabricJSON) {
                     const overlayDataUrl = await renderFabricLayerDataURL(
@@ -1107,7 +1956,17 @@
 
         function exportProjectJSON(btn) {
             withButtonState(btn, "Salvataggio...", async () => {
-                const projectData = { projectName: state.projectName, originalDataUrl: state.originalDataUrl, scale: state.scale, x: state.x, y: state.y, excludedFrames: state.excludedFrames, framesData: state.framesData };
+                                const projectData = {
+                    projectName: state.projectName,
+                    originalDataUrl: state.originalDataUrl,
+                    scale: state.scale,
+                    x: state.x,
+                    y: state.y,
+                    excludedFrames: state.excludedFrames,
+                    leadingBlankFrames: state.leadingBlankFrames || 0,
+                    trailingBlankFrames: state.trailingBlankFrames || 0,
+                    framesData: state.framesData
+                };
                 const blob = new Blob([JSON.stringify(projectData)], {type: "application/json"});
                 const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${state.projectName}_backup.json`;
                 document.body.appendChild(link); link.click(); document.body.removeChild(link);
@@ -1319,65 +2178,72 @@
                 opacityValue.innerText = settings.opacity + '%';
             }
 
-            function ensureGradientControlsPanel() {
+                        function ensureGradientControlsPanel() {
                 if (document.getElementById('gradient-controls')) return;
 
-                const textControls = document.getElementById('text-controls');
-                if (!textControls || !textControls.parentNode) return;
+                const sidebar = document.querySelector('#modal-editor .md\\:w-80');
+                if (!sidebar) return;
 
                 const panel = document.createElement('div');
                 panel.id = 'gradient-controls';
-                panel.className = 'flex flex-col gap-3 bg-gray-100 p-3 border border-gray-300 rounded';
+                panel.className = 'border border-gray-300 bg-white';
 
                 panel.innerHTML = `
-                    <div class="flex items-center justify-between gap-3">
-                        <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider">Sfumatura leggibilita</h4>
+                    <button class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-bold uppercase text-brand-blue bg-gray-100" onclick="toggleAccordion(this)">
+                        Sfumatura leggibilita <span data-accordion-icon>+</span>
+                    </button>
+                    <div class="p-3 space-y-3 hidden">
                         <label class="flex items-center gap-2 text-[10px] font-bold text-brand-blue uppercase cursor-pointer">
                             <input type="checkbox" id="gradient-enabled" class="accent-brand-blue" onchange="toggleGradientLayer(this.checked)">
-                            Attiva
+                            Attiva sfumatura
                         </label>
-                    </div>
 
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-600 mb-1">Direzione</label>
-                        <select id="gradient-direction" class="w-full border border-gray-300 p-1.5 text-xs bg-white" onchange="updateGradientSetting('direction', this.value)">
-                            <option value="top">Dall'alto</option>
-                            <option value="bottom">Dal basso</option>
-                            <option value="left">Da sinistra</option>
-                            <option value="right">Da destra</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
-                            <span>Dimensione</span>
-                            <span id="gradient-size-value">45%</span>
-                        </label>
-                        <input type="range" id="gradient-size" min="5" max="100" step="1" value="45" oninput="updateGradientSetting('size', this.value)">
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-bold text-gray-600 mb-1">Colore</label>
-                        <input type="color" id="gradient-color" value="#000000" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateGradientSetting('color', this.value)">
-                        <div class="flex gap-1.5 mt-1">
-                            <button class="w-4 h-4 rounded-full bg-[#000000] border border-gray-300" onclick="applyGradientColor('#000000')" title="Nero"></button>
-                            <button class="w-4 h-4 rounded-full bg-[#333333] border border-gray-300" onclick="applyGradientColor('#333333')" title="Grigio scuro"></button>
-                            <button class="w-4 h-4 rounded-full bg-[#0146bc] border border-gray-300" onclick="applyGradientColor('#0146bc')" title="Blu Poste"></button>
-                            <button class="w-4 h-4 rounded-full bg-[#eddc01] border border-gray-300" onclick="applyGradientColor('#eddc01')" title="Giallo Poste"></button>
-                            <button class="w-4 h-4 rounded-full bg-[#ffffff] border border-gray-300" onclick="applyGradientColor('#ffffff')" title="Bianco"></button>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 mb-1">Direzione</label>
+                            <select id="gradient-direction" class="w-full border border-gray-300 p-1.5 text-xs bg-white" onchange="updateGradientSetting('direction', this.value)">
+                                <option value="top">Dall'alto</option>
+                                <option value="bottom">Dal basso</option>
+                                <option value="left">Da sinistra</option>
+                                <option value="right">Da destra</option>
+                            </select>
                         </div>
-                    </div>
 
-                    <div>
-                        <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
-                            <span>Trasparenza iniziale</span>
-                            <span id="gradient-opacity-value">65%</span>
-                        </label>
-                        <input type="range" id="gradient-opacity" min="0" max="100" step="1" value="65" oninput="updateGradientSetting('opacity', this.value)">
+                        <div>
+                            <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                <span>Dimensione</span>
+                                <span id="gradient-size-value">45%</span>
+                            </label>
+                            <input type="range" id="gradient-size" min="5" max="100" step="1" value="45" oninput="updateGradientSetting('size', this.value)">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 mb-1">Colore</label>
+                            <input type="color" id="gradient-color" value="#000000" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateGradientSetting('color', this.value)">
+                            <div class="flex gap-1.5 mt-1">
+                                <button class="w-4 h-4 rounded-full bg-[#000000] border border-gray-300" onclick="applyGradientColor('#000000')" title="Nero"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#333333] border border-gray-300" onclick="applyGradientColor('#333333')" title="Grigio scuro"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#0146bc] border border-gray-300" onclick="applyGradientColor('#0146bc')" title="Blu Poste"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#eddc01] border border-gray-300" onclick="applyGradientColor('#eddc01')" title="Giallo Poste"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#ffffff] border border-gray-300" onclick="applyGradientColor('#ffffff')" title="Bianco"></button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                <span>Intensita</span>
+                                <span id="gradient-opacity-value">65%</span>
+                            </label>
+                            <input type="range" id="gradient-opacity" min="0" max="100" step="1" value="65" oninput="updateGradientSetting('opacity', this.value)">
+                        </div>
                     </div>
                 `;
 
-                textControls.parentNode.insertBefore(panel, textControls);
+                const objectControls = document.getElementById('object-controls');
+                if (objectControls && objectControls.parentNode === sidebar) {
+                    sidebar.insertBefore(panel, objectControls);
+                } else {
+                    sidebar.appendChild(panel);
+                }
             }
 
             window.toggleGradientLayer = function(enabled) {
@@ -1460,9 +2326,10 @@
             };
 
             const originalSyncUIControls = syncUIControls;
-            syncUIControls = function() {
+                        syncUIControls = function() {
                 syncGradientLayer(false);
                 originalSyncUIControls();
+                ensureGradientControlsPanel();
                 syncGradientControls();
             };
 
