@@ -2089,7 +2089,7 @@
         };
 
         // --- ESPORTAZIONE AD ALTA RISOLUZIONE VETTORIALE ---
-        async function extractFramesAsBlobs() {
+                async function extractFramesAsBlobs(options = {}) {
             if (fCanvas && currentEditingFrameIndex !== -1) {
                 await syncPreview();
             }
@@ -2098,6 +2098,8 @@
                 await document.fonts.ready;
             }
 
+            const mimeType = options.mimeType || 'image/png';
+            const quality = typeof options.quality === 'number' ? options.quality : 1.0;
             const blobs = [];
             const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
             const targetW = 1080; const targetH = 1350;
@@ -2125,14 +2127,14 @@
                         state.framesData[i].fabricJSON,
                         targetW,
                         targetH,
-                        1
+                        2
                     );
 
                     const overlayImg = await loadImageFromDataURL(overlayDataUrl);
                     ctx.drawImage(overlayImg, 0, 0, targetW, targetH);
                 }
 
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 1.0));
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, mimeType, quality));
                 blobs.push(blob);
             }
                         return blobs;
@@ -2140,9 +2142,9 @@
 
         function exportCarousel(btn) {
             withButtonState(btn, "ZIP...", async () => {
-                const blobs = await extractFramesAsBlobs();
+                const blobs = await extractFramesAsBlobs({ mimeType: 'image/png' });
                 const zip = new JSZip();
-                blobs.forEach((b, i) => zip.file(`${state.projectName}_${String(i + 1).padStart(2, '0')}.jpg`, b));
+                blobs.forEach((b, i) => zip.file(`${state.projectName}_${String(i + 1).padStart(2, '0')}.png`, b));
                 const zipBlob = await zip.generateAsync({type: "blob"});
                 const link = document.createElement('a'); link.href = URL.createObjectURL(zipBlob); link.download = `${state.projectName}_carousel.zip`;
                 document.body.appendChild(link); link.click(); document.body.removeChild(link);
