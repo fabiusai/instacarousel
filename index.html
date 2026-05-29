@@ -3,6 +3,1355 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carousel Asset Generator Pro - V3</title>
+    
+    <link rel="icon" href="favicon.ico">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,700;1,400;1,700&family=Montserrat:ital,wght@0,400;0,600;0,700;0,800;1,400;1,600;1,700;1,800&family=Nunito:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            yellow: '#eddc01',
+                            blue: '#0146bc',
+                            bluedark: '#013896',
+                            gray: '#f3f4f6'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                        montserrat: ['Montserrat', 'sans-serif'],
+                        nunito: ['Nunito', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; background: #0146bc; cursor: pointer; border-radius: 50%; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #cbd5e1; border-radius: 2px; }
+        
+        .snap-container { scroll-snap-type: x mandatory; overflow-x: auto; scrollbar-width: none; }
+        .snap-container::-webkit-scrollbar { display: none; }
+        .snap-item { scroll-snap-align: center; flex-shrink: 0; height: 100% !important; width: auto !important; object-fit: contain; }
+
+        .btn-primary { background-color: #0146bc; color: white; border: 2px solid #0146bc; padding: 0.5rem 1.5rem; text-transform: uppercase; font-weight: 600; font-size: 0.875rem; transition: background-color 0.2s; }
+        .btn-primary:hover { background-color: #013896; }
+        .btn-secondary { background-color: transparent; color: #0146bc; border: 2px solid #0146bc; padding: 0.5rem 1.5rem; text-transform: uppercase; font-weight: 600; font-size: 0.875rem; transition: background-color 0.2s; }
+        .btn-secondary:hover { background-color: #f8fafc; }
+        
+        .canvas-container { margin: 0 auto; }
+        
+        /* FIX Quill per farlo sembrare integrato nella UI Poste */
+        .ql-toolbar.ql-snow { border: none !important; border-bottom: 1px solid #e5e7eb !important; padding: 4px !important; }
+        .ql-container.ql-snow { border: none !important; font-family: inherit; font-size: 14px; }
+        .ql-editor { padding: 8px !important; min-height: 80px; }
+
+        /* Teatro di posa nascosto */
+        #render-stage { position: absolute; left: -9999px; top: -9999px; z-index: -1; pointer-events: none; }
+        #render-text-container { display: inline-block; padding: 4px; white-space: pre-wrap; word-wrap: break-word; }
+        #render-text-content p { margin: 0 !important; padding: 0 !important; line-height: inherit; }
+    </style>
+</head>
+<body class="bg-white text-gray-800 antialiased min-h-screen flex flex-col">
+
+    <header class="bg-brand-blue py-6 px-4 border-b-4 border-brand-yellow">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <h1 class="text-white text-2xl font-bold tracking-wide uppercase">Carousel Generator V3</h1>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col max-w-6xl mx-auto w-full p-4 md:p-8">
+        
+        <section id="section-setup" class="mb-12 max-w-lg border border-gray-200 p-6 bg-brand-gray shadow-sm">
+            <h2 class="text-xl font-bold text-brand-blue mb-4 uppercase">1. Configurazione Progetto</h2>
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="text-sm font-semibold text-gray-600 block mb-1">Nuovo Progetto (inserisci nome)</label>
+                    <input type="text" id="project-name" placeholder="Es. Campagna_Estiva" class="w-full border-2 border-gray-300 p-3 outline-none focus:border-brand-blue transition-colors">
+                </div>
+                <button id="btn-start" class="btn-primary w-full" onclick="startProject(this)">Inizia Vuoto</button>
+                
+                <div class="mt-4 border-t border-gray-300 pt-4">
+                    <label class="text-sm font-semibold text-gray-600 block mb-2">Hai già un file salvato?</label>
+                    <button class="btn-secondary w-full border-gray-400 text-gray-600 hover:text-brand-blue hover:border-brand-blue" onclick="document.getElementById('import-upload').click()">
+                        Importa da File JSON
+                    </button>
+                    <input type="file" id="import-upload" class="hidden" accept=".json" onchange="handleImportJSON(event)">
+                </div>
+            </div>
+        </section>
+
+        <section id="section-upload" class="mb-12 max-w-md hidden">
+            <h2 class="text-xl font-bold text-brand-blue mb-4 uppercase">2. Caricamento Asset</h2>
+            <div class="border-2 border-dashed border-gray-400 bg-brand-gray p-8 text-center cursor-pointer hover:border-brand-blue transition-colors" onclick="document.getElementById('file-upload').click()">
+                <svg class="w-12 h-12 mx-auto text-brand-blue mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="square" stroke-linejoin="miter" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                <span class="font-semibold text-gray-700">Seleziona immagine orizzontale</span>
+                <input type="file" id="file-upload" class="hidden" accept="image/png, image/jpeg" onchange="handleImageUpload(event)">
+            </div>
+        </section>
+
+        <section id="section-editor" class="hidden flex-col gap-8 w-full">
+            <div class="border-b-2 border-gray-200 pb-4 flex justify-between items-end">
+                <div>
+                    <h2 class="text-xl font-bold text-brand-blue uppercase">3. Ritaglio e Adattamento (4:5)</h2>
+                    <p class="text-sm text-gray-500 font-medium" id="display-project-name">Progetto: -</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <div class="lg:col-span-1 flex flex-col gap-5 bg-brand-gray p-6 border border-gray-200">
+                    <h3 class="font-bold text-brand-blue uppercase text-sm border-b border-gray-300 pb-2">Posizionamento Sfondo</h3>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Ingrandimento</label>
+                        <input type="range" id="slider-scale" step="0.001" value="1" oninput="updateEditorState()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Sposta X</label>
+                        <input type="range" id="slider-x" step="1" value="0" oninput="updateEditorState()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Sposta Y</label>
+                        <input type="range" id="slider-y" step="1" value="0" oninput="updateEditorState()">
+                    </div>
+                    
+                    <div id="exclude-container" class="mt-2 pt-4 border-t border-gray-300">
+                        <label class="flex justify-between text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                            <span>Escludi frame finali</span>
+                            <span id="exclude-value" class="text-brand-blue font-bold text-base bg-white px-2 py-0.5 border border-gray-300">0</span>
+                        </label>
+                        <input type="range" id="slider-exclude" min="0" max="0" step="1" value="0" oninput="updateEditorState()">
+                    </div>
+
+                    <div class="mt-2 pt-4 border-t border-gray-300 flex flex-col gap-2">
+                        <input type="file" id="replace-image-upload" class="hidden" accept="image/png, image/jpeg" onchange="handleReplaceMainImage(event)">
+                        <button class="btn-secondary w-full text-[11px] py-2" onclick="document.getElementById('replace-image-upload').click()">Sostituisci immagine</button>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="btn-secondary text-[11px] px-1 py-2" onclick="addBlankFrame('before')">+ Vuoto prima</button>
+                            <button class="btn-secondary text-[11px] px-1 py-2" onclick="addBlankFrame('after')">+ Vuoto dopo</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1 hover:bg-gray-100" onclick="removeBlankFrame('before')">- Prima</button>
+                            <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1 hover:bg-gray-100" onclick="removeBlankFrame('after')">- Dopo</button>
+                        </div>
+                        <p class="text-[10px] text-gray-600">Vuoti: <span id="blank-before-value">0</span> prima / <span id="blank-after-value">0</span> dopo</p>
+                    </div>
+                    
+                    <div class="mt-6 pt-5 border-t-2 border-gray-300 flex flex-col gap-3">
+                        <button class="btn-secondary w-full" onclick="openPlayground(this)">Testa Carousel</button>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="btn-primary text-[11px] px-1 py-3" onclick="exportCarousel(this)">File .ZIP</button>
+                            <button class="btn-secondary text-[11px] px-1 py-3" onclick="exportProjectJSON(this)">Salva JSON</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-3 overflow-x-auto bg-gray-100 border border-gray-300 pb-4 relative">
+                    <div id="crop-area" class="relative h-[350px] md:h-[500px] overflow-hidden origin-top-left" style="width: 0px;">
+                        <img id="preview-img" class="absolute top-0 left-0 origin-top-left pointer-events-none max-w-none" style="width: auto; height: auto;" src="" alt="preview">
+                        <div id="grid-container" class="absolute inset-0 flex pointer-events-none"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal-editor" class="fixed inset-0 z-50 bg-gray-900/95 hidden flex-col justify-center items-center p-4">
+        <div class="absolute top-6 right-6 flex gap-3">
+            <button class="bg-gray-100 text-brand-blue hover:bg-white border-2 border-white font-bold text-xs px-4 py-2 uppercase tracking-widest transition-colors shadow-lg" onclick="syncPreview()">↻ Aggiorna Preview</button>
+            <button class="bg-brand-yellow text-brand-blue hover:bg-white font-bold text-sm px-6 py-2 uppercase tracking-widest transition-colors shadow-lg" onclick="closeAdvancedEditor()">Salva e Chiudi</button>
+        </div>
+        
+        <div class="w-full max-w-6xl bg-white flex flex-col md:flex-row h-[85vh] rounded shadow-2xl overflow-hidden border-4 border-brand-blue">
+            
+            <div class="w-full md:w-80 bg-gray-50 border-r border-gray-300 p-5 flex flex-col gap-5 overflow-y-auto" id="sidebar-container">
+                </div>
+
+            <div class="flex-1 bg-gray-300 flex items-center justify-center p-8 relative overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiNjYmQ1ZTEiLz48L3N2Zz4=')]">
+                <div class="shadow-2xl border border-gray-400 bg-white relative" id="canvas-wrapper">
+                    <div id="guide-v" class="absolute top-0 bottom-0 left-1/2 w-px bg-brand-yellow z-50 pointer-events-none hidden"></div>
+                    <div id="guide-h" class="absolute left-0 right-0 top-1/2 h-px bg-brand-yellow z-50 pointer-events-none hidden"></div>
+                    <canvas id="fabric-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="render-stage">
+        <div id="render-text-container">
+            <div id="render-text-content"></div>
+        </div>
+    </div>
+
+    <div id="modal-playground" class="fixed inset-0 z-50 bg-gray-900/95 hidden flex-col justify-center items-center p-4">
+        <div class="absolute top-6 right-6">
+            <button class="text-white hover:text-brand-yellow font-bold text-lg uppercase tracking-widest" onclick="closePlayground()">Chiudi X</button>
+        </div>
+        <p class="text-brand-yellow mb-6 text-sm uppercase tracking-widest font-bold bg-brand-blue px-4 py-1">Simulatore Swipe Instagram (4:5)</p>
+        <div class="w-full max-w-[360px] aspect-[4/5] bg-black border-[12px] border-gray-800 rounded-[24px] shadow-2xl overflow-hidden relative">
+            <div id="playground-container" class="snap-container flex w-full h-full bg-black"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- OVERRIDE FABRIC.JS (Compatibilità vecchi JSON) ---
+        // Manteniamo questi overrides SOLO per retrocompatibilità qualora l'utente carichi un vecchio file JSON
+        // basato su fabric.Textbox. I nuovi testi utilizzeranno il motore a Immagine (DOM-to-Image).
+        if (!fabric.Rect.prototype._decorBoxRenderPatched) {
+            fabric.Rect.prototype._decorBoxOriginalRender = fabric.Rect.prototype._render;
+            fabric.Rect.prototype._render = function(ctx) {
+                fabric.Rect.prototype._decorBoxOriginalRender.call(this, ctx);
+                if (!this.isDecorBox) return;
+                var w = this.width || 0; var h = this.height || 0; var x = -w / 2; var y = -h / 2;
+                var barW = Math.max(1, parseFloat(this.customBoxBarWidth) || 8);
+                ctx.save(); ctx.fillStyle = this.customBoxBarColor || '#eddc01';
+                if (this.customBoxBarLeft) ctx.fillRect(x, y, Math.min(barW, w), h);
+                if (this.customBoxBarRight) ctx.fillRect(x + w - Math.min(barW, w), y, Math.min(barW, w), h);
+                if (this.customBoxBarTop) ctx.fillRect(x, y, w, Math.min(barW, h));
+                if (this.customBoxBarBottom) ctx.fillRect(x, y + h - Math.min(barW, h), w, Math.min(barW, h));
+                ctx.restore();
+            };
+            fabric.Rect.prototype._decorBoxRenderPatched = true;
+        }
+
+        // --- STATO DEL PROGETTO ---
+        var state = window.__carouselGeneratorState || (window.__carouselGeneratorState = {
+            projectName: '', imgObj: null, originalDataUrl: null, baseScale: 1, scale: 1, x: 0, y: 0,
+            maxPossibleFrames: 1, imageFramesCount: 1, leadingBlankFrames: 0, trailingBlankFrames: 0,
+            excludedFrames: 0, finalFramesCount: 1, isRestoring: false,
+            viewportHeight: window.innerWidth < 768 ? 350 : 500, framesData: [],
+            get frameWidth() { return this.viewportHeight * (4/5); }
+        });
+
+        var fCanvas = null;
+        var currentEditingFrameIndex = -1;
+        var quill = null;
+        var previewTimeout = null;
+
+        var CUSTOM_FABRIC_PROPS = [
+            'isDecorBox', 'customBoxBarLeft', 'customBoxBarRight', 'customBoxBarTop', 'customBoxBarBottom',
+            'customBoxBarColor', 'customBoxBarWidth', 'isGradientLayer', 'gradientLayerId', 'gradientConfig',
+            'isCustomTextAsset', 'sourceHTML', 'globalSettings'
+        ];
+
+        // --- SISTEMA DI UNDO / REDO ---
+        var undoStack = [];
+        var undoRestoring = false;
+        var undoLimit = 30;
+        var fabricUndoHookInstalled = false;
+
+        function cloneForUndo(value) { return JSON.parse(JSON.stringify(value)); }
+        function getUndoSnapshot() {
+            const framesData = cloneForUndo(state.framesData || []);
+            if (fCanvas && currentEditingFrameIndex !== -1 && framesData[currentEditingFrameIndex]) {
+                framesData[currentEditingFrameIndex].fabricJSON = getFrameFabricJSON(fCanvas);
+                delete framesData[currentEditingFrameIndex].thumbnailBase64;
+            }
+            return {
+                projectName: state.projectName, originalDataUrl: state.originalDataUrl, baseScale: state.baseScale,
+                scale: state.scale, x: state.x, y: state.y, maxPossibleFrames: state.maxPossibleFrames,
+                imageFramesCount: state.imageFramesCount, leadingBlankFrames: state.leadingBlankFrames || 0,
+                trailingBlankFrames: state.trailingBlankFrames || 0, excludedFrames: state.excludedFrames || 0,
+                finalFramesCount: state.finalFramesCount || 1, framesData: framesData, currentEditingFrameIndex: currentEditingFrameIndex
+            };
+        }
+        function updateUndoButtons() {
+            document.querySelectorAll('[data-undo-button]').forEach(button => {
+                button.disabled = undoStack.length === 0;
+                button.classList.toggle('opacity-50', undoStack.length === 0);
+                button.classList.toggle('cursor-not-allowed', undoStack.length === 0);
+            });
+        }
+        function saveUndoSnapshot() {
+            if (undoRestoring || !state.originalDataUrl) return;
+            const snapshot = getUndoSnapshot(); const snapshotKey = JSON.stringify(snapshot);
+            const last = undoStack[undoStack.length - 1];
+            if (last && last._key === snapshotKey) return;
+            snapshot._key = snapshotKey; undoStack.push(snapshot);
+            if (undoStack.length > undoLimit) undoStack.shift();
+            updateUndoButtons();
+        }
+        function restoreImageForUndo(dataUrl) {
+            return new Promise(resolve => {
+                if (!dataUrl) { state.imgObj = null; resolve(); return; }
+                const img = new Image(); img.onload = () => { state.imgObj = img; resolve(); }; img.src = dataUrl;
+            });
+        }
+        window.undoLastOperation = async function() {
+            if (!undoStack.length) return;
+            const snapshot = undoStack.pop(); undoRestoring = true;
+            await restoreImageForUndo(snapshot.originalDataUrl);
+            state.projectName = snapshot.projectName; state.originalDataUrl = snapshot.originalDataUrl;
+            state.baseScale = snapshot.baseScale; state.scale = snapshot.scale; state.x = snapshot.x; state.y = snapshot.y;
+            state.maxPossibleFrames = snapshot.maxPossibleFrames; state.imageFramesCount = snapshot.imageFramesCount;
+            state.leadingBlankFrames = snapshot.leadingBlankFrames || 0; state.trailingBlankFrames = snapshot.trailingBlankFrames || 0;
+            state.excludedFrames = snapshot.excludedFrames || 0; state.finalFramesCount = snapshot.finalFramesCount || 1;
+            state.framesData = cloneForUndo(snapshot.framesData || []); state.isRestoring = true;
+            const projectLabel = document.getElementById('display-project-name'); if (projectLabel) projectLabel.innerText = "Progetto: " + state.projectName;
+            if (state.imgObj) restoreEditorUI();
+            const editorModal = document.getElementById('modal-editor');
+            if (editorModal && !editorModal.classList.contains('hidden') && snapshot.currentEditingFrameIndex !== -1) {
+                currentEditingFrameIndex = snapshot.currentEditingFrameIndex; openAdvancedTextEditor(currentEditingFrameIndex);
+            }
+            undoRestoring = false; updateUndoButtons();
+        };
+
+        function shouldTrackUndoTarget(target) {
+            const el = target.closest('button, input, select, textarea, [contenteditable="true"], canvas');
+            if (!el || el.dataset.undoButton !== undefined) return false;
+            const action = [el.getAttribute('onclick') || '', el.getAttribute('oninput') || '', el.getAttribute('onchange') || ''].join(' ');
+            if (/exportCarousel|exportProjectJSON|openPlayground|closePlayground|closeAdvancedEditor|syncPreview/.test(action)) return false;
+            return /addBlankFrame|removeBlankFrame|handleReplaceMainImage|addPreset|addDecorBox|handleOverlayImageImport|duplicateSelectedObject|copySelectedObjectToFrame|bringSelectedForward|sendSelectedBackward|alignObject|deleteSelectedObject|applyTextToCanvas|applyQuickColor/.test(action) || el.id === 'fabric-canvas' || el.isContentEditable;
+        }
+
+        function installUndoControls() {
+            if (!document.getElementById('btn-undo-main')) {
+                const exportArea = document.querySelector('button[onclick="openPlayground(this)"]');
+                if (exportArea) {
+                    const button = document.createElement('button'); button.id = 'btn-undo-main'; button.dataset.undoButton = '';
+                    button.className = 'btn-secondary w-full text-[11px] py-2'; button.type = 'button'; button.textContent = 'Annulla ultima operazione';
+                    button.onclick = undoLastOperation; exportArea.insertAdjacentElement('beforebegin', button);
+                }
+            }
+            if (!document.getElementById('btn-undo-editor')) {
+                const modalActions = document.querySelector('#modal-editor .absolute.top-6.right-6');
+                if (modalActions) {
+                    const button = document.createElement('button'); button.id = 'btn-undo-editor'; button.dataset.undoButton = '';
+                    button.className = 'bg-gray-100 text-brand-blue hover:bg-white border-2 border-white font-bold text-xs px-4 py-2 uppercase tracking-widest transition-colors shadow-lg';
+                    button.type = 'button'; button.textContent = 'Annulla'; button.onclick = undoLastOperation;
+                    modalActions.insertAdjacentElement('afterbegin', button);
+                }
+            }
+            updateUndoButtons();
+        }
+
+        document.addEventListener('pointerdown', event => { if (shouldTrackUndoTarget(event.target)) saveUndoSnapshot(); }, true);
+        document.addEventListener('change', event => { if (shouldTrackUndoTarget(event.target)) saveUndoSnapshot(); }, true);
+        document.addEventListener('keydown', event => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); undoLastOperation(); return; }
+            if (shouldTrackUndoTarget(event.target)) saveUndoSnapshot();
+        }, true);
+
+        const originalInitFabricCanvasForUndo = initFabricCanvas;
+        initFabricCanvas = function() {
+            originalInitFabricCanvasForUndo();
+            if (fabricUndoHookInstalled || !fCanvas) return;
+            fabricUndoHookInstalled = true;
+            fCanvas.on('mouse:down', event => { if (event.target) saveUndoSnapshot(); });
+            fCanvas.on('object:added', updateUndoButtons);
+            fCanvas.on('object:removed', updateUndoButtons);
+            fCanvas.on('object:modified', updateUndoButtons);
+        };
+
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', installUndoControls); } else { installUndoControls(); }
+        window.addEventListener('resize', () => { state.viewportHeight = window.innerWidth < 768 ? 350 : 500; if(state.imgObj) { state.isRestoring = true; restoreEditorUI(); } });
+
+        // --- INIZIALIZZAZIONE PROGETTO ---
+        async function withButtonState(btn, activeText, workFn) {
+            const originalText = btn.innerHTML; btn.innerHTML = activeText; btn.disabled = true;
+            try { await workFn(); btn.innerHTML = "Fatto!"; setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 2000); } 
+            catch (err) { console.error(err); btn.innerHTML = "Errore!"; setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 3000); }
+        }
+
+        function startProject(btn) {
+            const input = document.getElementById('project-name'); const name = input.value.trim();
+            if (!name) return alert("Inserisci un nome progetto.");
+            state.projectName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            document.getElementById('display-project-name').innerText = "Progetto: " + state.projectName;
+            document.getElementById('section-setup').classList.add('hidden'); document.getElementById('section-upload').classList.remove('hidden');
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0]; if (!file) return;
+            loadMainImageFile(file, () => initEditor());
+        }
+
+        function loadMainImageFile(file, onReady) {
+            const reader = new FileReader();
+            reader.onload = (e) => { state.originalDataUrl = e.target.result; const img = new Image(); img.onload = () => { state.imgObj = img; onReady(); }; img.src = state.originalDataUrl; };
+            reader.readAsDataURL(file);
+        }
+
+        function handleReplaceMainImage(event) {
+            const file = event.target.files[0]; if (!file) return;
+            loadMainImageFile(file, () => {
+                state.baseScale = state.viewportHeight / state.imgObj.naturalHeight; state.scale = state.baseScale; state.x = 0; state.y = 0; state.isRestoring = true;
+                state.framesData.forEach(frame => { if (frame) delete frame.thumbnailBase64; });
+                restoreEditorUI();
+            });
+            event.target.value = '';
+        }
+
+        function isBlankFrameData(frameData) { return !!(frameData && frameData.isBlankFrame); }
+        function getBlankFramesCount() { if (!Array.isArray(state.framesData)) return 0; return state.framesData.filter(isBlankFrameData).length; }
+        function getInternalBlankFramesCount() {
+            if (!Array.isArray(state.framesData)) return 0;
+            const before = state.leadingBlankFrames || 0; const after = state.trailingBlankFrames || 0;
+            return state.framesData.filter((frame, index) => { return isBlankFrameData(frame) && index >= before && index < state.framesData.length - after; }).length;
+        }
+
+        function ensureFramesData() { if (!Array.isArray(state.framesData)) state.framesData = []; }
+        function addBlankFrame(position) {
+            ensureFramesData();
+            if (position === 'before') { state.leadingBlankFrames = (state.leadingBlankFrames || 0) + 1; state.framesData.unshift({ isBlankFrame: true }); }
+            else if (position === 'inside') {
+                const total = state.finalFramesCount || state.framesData.length || 0; const maxAfterFrame = Math.max(1, total - 1);
+                const answer = prompt(`Inserisci il frame vuoto dopo quale frame? Inserisci un numero da 1 a ${maxAfterFrame}.`, String(maxAfterFrame));
+                if (answer === null) return;
+                const afterFrameNumber = Math.min(maxAfterFrame, Math.max(1, parseInt(answer, 10) || 1));
+                state.framesData.splice(afterFrameNumber, 0, { isBlankFrame: true });
+            } else { state.trailingBlankFrames = (state.trailingBlankFrames || 0) + 1; state.framesData.push({ isBlankFrame: true }); }
+            updateEditorState();
+        }
+
+        function removeBlankFrame(position) {
+            ensureFramesData();
+            if (position === 'before' && state.leadingBlankFrames > 0 && isBlankFrameData(state.framesData[0])) { state.leadingBlankFrames--; state.framesData.shift(); }
+            if (position === 'after' && state.trailingBlankFrames > 0 && isBlankFrameData(state.framesData[state.framesData.length - 1])) { state.trailingBlankFrames--; state.framesData.pop(); }
+            updateEditorState();
+        }
+
+        function getFrameInfo(frameIndex) {
+            ensureFramesData();
+            if (isBlankFrameData(state.framesData[frameIndex])) return { type: 'blank' };
+            const imageCount = state.imageFramesCount || Math.max(1, state.maxPossibleFrames - state.excludedFrames);
+            let imageIndex = 0;
+            for (let i = 0; i <= frameIndex; i++) {
+                if (isBlankFrameData(state.framesData[i])) continue;
+                if (i === frameIndex) break;
+                imageIndex++;
+            }
+            if (imageIndex >= imageCount) return { type: 'blank' };
+            return { type: 'image', imageIndex };
+        }
+
+        function loadImageFromBlob(blob) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(blob); const img = new Image();
+                img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Impossibile caricare l'immagine esportata.")); };
+                img.src = url;
+            });
+        }
+
+        function exportFullEditedImage(btn) {
+            withButtonState(btn, "PNG...", async () => {
+                const blobs = await extractFramesAsBlobs(); const targetW = 1080; const targetH = 1350;
+                const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                canvas.width = targetW * blobs.length; canvas.height = targetH; ctx.fillStyle = "white"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                for (let i = 0; i < blobs.length; i++) { const img = await loadImageFromBlob(blobs[i]); ctx.drawImage(img, i * targetW, 0, targetW, targetH); }
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
+                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${state.projectName}_immagine_intera.png`;
+                document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(link.href);
+            });
+        }
+
+        function installEditorialExportAndFrameControls() {
+            const afterBlankButton = Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('onclick') === "addBlankFrame('after')");
+            if (afterBlankButton && !document.getElementById('btn-add-blank-inside')) {
+                const button = document.createElement('button'); button.id = 'btn-add-blank-inside'; button.className = 'btn-secondary text-[11px] px-1 py-2 col-span-2';
+                button.type = 'button'; button.textContent = '+ Vuoto in mezzo'; button.onclick = () => addBlankFrame('inside');
+                afterBlankButton.parentElement.appendChild(button);
+            }
+            const blankInfo = document.getElementById('blank-after-value');
+            if (blankInfo && !document.getElementById('blank-inside-value')) { blankInfo.parentElement.insertAdjacentHTML('beforeend', ' / <span id="blank-inside-value">0</span> in mezzo'); }
+            const zipButton = document.querySelector('button[onclick="exportCarousel(this)"]');
+            if (zipButton && !document.getElementById('btn-export-full-edited-image')) {
+                const button = document.createElement('button'); button.id = 'btn-export-full-edited-image'; button.className = 'btn-secondary w-full text-[11px] px-1 py-3 mt-2';
+                button.type = 'button'; button.textContent = 'Immagine intera'; button.onclick = function() { exportFullEditedImage(this); };
+                zipButton.parentElement.insertAdjacentElement('afterend', button);
+            }
+        }
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', installEditorialExportAndFrameControls); } else { installEditorialExportAndFrameControls(); }
+
+        function handleImportJSON(event) {
+            const file = event.target.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    state.projectName = data.projectName; state.originalDataUrl = data.originalDataUrl;
+                    state.scale = data.scale; state.x = data.x; state.y = data.y;
+                    state.excludedFrames = data.excludedFrames || 0; state.leadingBlankFrames = data.leadingBlankFrames || 0; state.trailingBlankFrames = data.trailingBlankFrames || 0;
+                    state.framesData = data.framesData || []; state.isRestoring = true;
+                    const img = new Image(); img.onload = () => { state.imgObj = img; restoreEditorUI(); }; img.src = state.originalDataUrl;
+                } catch(err) { alert("Errore file JSON: " + err.message); }
+            };
+            reader.readAsText(file);
+        }
+
+        function initEditor() {
+            document.getElementById('section-upload').classList.add('hidden'); document.getElementById('section-editor').classList.remove('hidden'); document.getElementById('section-editor').classList.add('flex');
+            document.getElementById('preview-img').src = state.imgObj.src;
+            state.baseScale = state.viewportHeight / state.imgObj.naturalHeight; state.scale = state.baseScale; state.x = 0; state.y = 0; state.excludedFrames = 0; 
+            const scaleSlider = document.getElementById('slider-scale'); scaleSlider.min = state.baseScale; scaleSlider.max = Math.max(1.5, state.baseScale * 5); scaleSlider.value = state.baseScale;
+            document.getElementById('slider-exclude').value = 0; updateEditorState();
+        }
+
+        function restoreEditorUI() {
+            document.getElementById('section-setup').classList.add('hidden'); document.getElementById('section-upload').classList.add('hidden'); document.getElementById('section-editor').classList.remove('hidden'); document.getElementById('section-editor').classList.add('flex');
+            document.getElementById('display-project-name').innerText = "Progetto: " + state.projectName; document.getElementById('preview-img').src = state.imgObj.src;
+            state.baseScale = state.viewportHeight / state.imgObj.naturalHeight;
+            const scaleSlider = document.getElementById('slider-scale'); scaleSlider.min = state.baseScale; scaleSlider.max = Math.max(1.5, state.baseScale * 5); scaleSlider.value = state.scale;
+            document.getElementById('slider-exclude').value = state.excludedFrames; updateEditorState();
+        }
+
+        function updateEditorState() {
+            if (!state.imgObj) return;
+            state.scale = parseFloat(document.getElementById('slider-scale').value);
+            const scaledW = state.imgObj.naturalWidth * state.scale; const scaledH = state.imgObj.naturalHeight * state.scale;
+            let maxFrames = Math.floor(scaledW / state.frameWidth);
+            if (maxFrames < 1) maxFrames = 1; if (maxFrames > 10) maxFrames = 10;
+            state.maxPossibleFrames = maxFrames;
+
+            const excludeSlider = document.getElementById('slider-exclude');
+            if (maxFrames >= 2) {
+                excludeSlider.disabled = false; excludeSlider.max = maxFrames - 1;
+                if (parseInt(excludeSlider.value) > maxFrames - 1) excludeSlider.value = maxFrames - 1;
+            } else { excludeSlider.max = 0; excludeSlider.value = 0; excludeSlider.disabled = true; }
+            state.excludedFrames = parseInt(excludeSlider.value) || 0;
+            document.getElementById('exclude-value').innerText = state.excludedFrames;
+
+            state.imageFramesCount = state.maxPossibleFrames - state.excludedFrames;
+            state.finalFramesCount = state.imageFramesCount + getBlankFramesCount();
+            const totalActiveWidth = state.finalFramesCount * state.frameWidth;
+
+            if (!state.framesData || state.framesData.length !== state.finalFramesCount) {
+                state.framesData = Array.from({ length: state.finalFramesCount }, (_, i) => state.framesData[i] || {});
+            }
+
+            document.getElementById('blank-before-value').innerText = state.leadingBlankFrames || 0;
+            document.getElementById('blank-after-value').innerText = state.trailingBlankFrames || 0;
+            const blankInsideValue = document.getElementById('blank-inside-value');
+            if (blankInsideValue) blankInsideValue.innerText = getInternalBlankFramesCount();
+
+            let minX = (state.imageFramesCount * state.frameWidth) - scaledW; if (minX > 0) minX = 0;
+            const sliderX = document.getElementById('slider-x'); sliderX.min = minX; sliderX.max = 0;
+            let minY = state.viewportHeight - scaledH; if (minY > 0) minY = 0;
+            const sliderY = document.getElementById('slider-y'); sliderY.min = minY; sliderY.max = 0;
+
+            if (state.isRestoring) { sliderX.value = state.x; sliderY.value = state.y; state.isRestoring = false; }
+            state.x = Math.max(minX, Math.min(0, parseFloat(sliderX.value) || 0));
+            state.y = Math.max(minY, Math.min(0, parseFloat(sliderY.value) || 0));
+            sliderX.value = state.x; sliderY.value = state.y;
+
+            document.getElementById('preview-img').style.transform = `translate(${state.x + ((state.leadingBlankFrames || 0) * state.frameWidth)}px, ${state.y}px) scale(${state.scale})`;
+            document.getElementById('crop-area').style.width = `${totalActiveWidth}px`;
+            
+            const gridContainer = document.getElementById('grid-container');
+            gridContainer.innerHTML = ''; 
+
+            for(let i = 0; i < state.finalFramesCount; i++) {
+                const frame = document.createElement('div');
+                const frameInfo = getFrameInfo(i);
+                frame.style.width = `${state.frameWidth}px`;
+                frame.style.height = `${state.viewportHeight}px`;
+                let borderClass = 'border-2 border-brand-yellow';
+                if (i > 0) borderClass += ' border-l-2 border-dashed border-l-brand-yellow/70';
+
+                const frameBgClass = frameInfo.type === 'blank' ? 'bg-white' : 'bg-black/5';
+                frame.className = `${borderClass} flex items-center justify-center ${frameBgClass} flex-shrink-0 relative group pointer-events-auto cursor-default`;
+                
+                const thumbImg = document.createElement('img');
+                thumbImg.id = `thumb-img-${i}`;
+                thumbImg.className = 'absolute inset-0 w-full h-full pointer-events-none z-0 object-contain';
+                
+                if(state.framesData[i] && state.framesData[i].thumbnailBase64) {
+                    thumbImg.src = state.framesData[i].thumbnailBase64;
+                } else if(state.framesData[i] && state.framesData[i].fabricJSON) {
+                    const tempCanvas = new fabric.StaticCanvas(null, { width: state.frameWidth, height: state.viewportHeight });
+                    tempCanvas.loadFromJSON(state.framesData[i].fabricJSON, () => { thumbImg.src = tempCanvas.toDataURL({ format: 'png' }); });
+                }
+
+                const label = document.createElement('span');
+                label.className = 'absolute bottom-3 left-3 bg-brand-yellow text-brand-blue font-bold text-lg px-3 py-1 z-10 pointer-events-none shadow-md';
+                label.innerText = i + 1;
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'absolute bottom-3 right-3 bg-brand-blue text-white py-1.5 px-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20 cursor-pointer shadow-md hover:bg-brand-bluedark flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider border border-white/20';
+                editBtn.innerHTML = `EDIT SLIDE`;
+                editBtn.onclick = () => openAdvancedTextEditor(i);
+                
+                frame.appendChild(thumbImg); frame.appendChild(label); frame.appendChild(editBtn); gridContainer.appendChild(frame);
+            }
+        }
+
+        window.debouncedSyncPreview = function() {
+            if (previewTimeout) clearTimeout(previewTimeout);
+            previewTimeout = setTimeout(() => { syncPreview(); }, 250); 
+        };
+
+        function prepareFabricForSave(canvas) {
+            if (!canvas) return;
+            canvas.getObjects().forEach(obj => {
+                if (obj.type === 'textbox') { obj.dirty = true; obj.initDimensions(); obj.setCoords(); }
+            });
+            canvas.renderAll();
+        }
+
+        function getFrameFabricJSON(canvas) {
+            const tempBg = canvas.backgroundImage; canvas.backgroundImage = null;
+            prepareFabricForSave(canvas);
+            const json = canvas.toJSON(CUSTOM_FABRIC_PROPS);
+            canvas.backgroundImage = tempBg; canvas.renderAll();
+            return json;
+        }
+
+        function loadImageFromDataURL(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const img = new Image(); img.onload = () => resolve(img); img.onerror = reject; img.src = dataUrl;
+            });
+        }
+
+        async function renderFabricLayerDataURL(fabricJSON, targetW, targetH, qualityMultiplier = 1) {
+            if (document.fonts && document.fonts.ready) await document.fonts.ready;
+            const layer = new fabric.StaticCanvas(null, { width: state.frameWidth, height: state.viewportHeight, preserveObjectStacking: true, renderOnAddRemove: false });
+            await new Promise(resolve => {
+                layer.loadFromJSON(fabricJSON, () => {
+                    layer.setBackgroundImage(null, () => {});
+                    layer.getObjects().forEach(obj => { obj.set({ objectCaching: false, dirty: true }); if (obj.type === 'textbox') { obj.initDimensions(); } obj.setCoords(); });
+                    layer.renderAll(); resolve();
+                });
+            });
+            const multiplier = Math.max(targetW / state.frameWidth, targetH / state.viewportHeight) * qualityMultiplier;
+            const dataUrl = layer.toDataURL({ format: 'png', multiplier: multiplier, enableRetinaScaling: false });
+            layer.dispose(); return dataUrl;
+        }
+
+        window.syncPreview = async function() {
+            if (currentEditingFrameIndex === -1 || !fCanvas) return;
+            const activeObj = fCanvas.getActiveObject(); if (activeObj && activeObj.isEditing) activeObj.exitEditing();
+            if (!state.framesData[currentEditingFrameIndex]) state.framesData[currentEditingFrameIndex] = {};
+            const fabricJSON = getFrameFabricJSON(fCanvas);
+            state.framesData[currentEditingFrameIndex].fabricJSON = fabricJSON;
+            const dataUrl = await renderFabricLayerDataURL(fabricJSON, state.frameWidth, state.viewportHeight, 2);
+            state.framesData[currentEditingFrameIndex].thumbnailBase64 = dataUrl;
+            const thumbImg = document.getElementById(`thumb-img-${currentEditingFrameIndex}`);
+            if (thumbImg) thumbImg.src = dataUrl;
+        };
+
+        function initFabricCanvas() {
+            if (fCanvas) return;
+            fCanvas = new fabric.Canvas('fabric-canvas', { preserveObjectStacking: true });
+            fCanvas.on('selection:created', syncUIControls);
+            fCanvas.on('selection:updated', syncUIControls);
+            fCanvas.on('selection:cleared', () => { showSelectionPanels(null); });
+            fCanvas.on('object:modified', debouncedSyncPreview);
+            fCanvas.on('object:moving', function(e) {
+                const obj = e.target; const center = fCanvas.getCenter(); const snapT = 15;
+                document.getElementById('guide-v').classList.add('hidden'); document.getElementById('guide-h').classList.add('hidden');
+                if (Math.abs(obj.left + (obj.width * obj.scaleX)/2 - center.left) < snapT) { obj.left = center.left - (obj.width * obj.scaleX)/2; document.getElementById('guide-v').classList.remove('hidden'); }
+                if (Math.abs(obj.top + (obj.height * obj.scaleY)/2 - center.top) < snapT) { obj.top = center.top - (obj.height * obj.scaleY)/2; document.getElementById('guide-h').classList.remove('hidden'); }
+                debouncedSyncPreview();
+            });
+            fCanvas.on('mouse:up', () => { document.getElementById('guide-v').classList.add('hidden'); document.getElementById('guide-h').classList.add('hidden'); });
+        }
+
+        window.openAdvancedTextEditor = function(frameIndex) {
+            currentEditingFrameIndex = frameIndex; initFabricCanvas(); fCanvas.clear();
+            fCanvas.setWidth(state.frameWidth); fCanvas.setHeight(state.viewportHeight);
+            
+            const tempCanvas = document.createElement('canvas'); tempCanvas.width = state.frameWidth; tempCanvas.height = state.viewportHeight;
+            const ctx = tempCanvas.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+            const frameInfo = getFrameInfo(frameIndex); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, state.frameWidth, state.viewportHeight);
+
+            if (frameInfo.type === 'image') {
+                const sourceX = ((frameInfo.imageIndex * state.frameWidth) - state.x) / state.scale;
+                const sourceY = Math.abs(state.y) / state.scale;
+                const sourceW = state.frameWidth / state.scale;
+                const sourceH = state.viewportHeight / state.scale;
+                ctx.drawImage(state.imgObj, sourceX, sourceY, sourceW, sourceH, 0, 0, state.frameWidth, state.viewportHeight);
+            }
+            
+            fabric.Image.fromURL(tempCanvas.toDataURL('image/png'), function(img) { fCanvas.setBackgroundImage(img, fCanvas.renderAll.bind(fCanvas)); });
+            document.getElementById('modal-editor').classList.remove('hidden'); document.getElementById('modal-editor').classList.add('flex');
+            
+            enhanceEditorSidebar(); showSelectionPanels(null);
+            if (state.framesData[frameIndex] && state.framesData[frameIndex].fabricJSON) {
+                fCanvas.loadFromJSON(state.framesData[frameIndex].fabricJSON, () => {
+                    fCanvas.setBackgroundImage(fCanvas.backgroundImage, fCanvas.renderAll.bind(fCanvas));
+                    prepareFabricForSave(fCanvas);
+                });
+            }
+        };
+
+        window.closeAdvancedEditor = async function() {
+            if (fCanvas && fCanvas.getActiveObject() && fCanvas.getActiveObject().isEditing) fCanvas.getActiveObject().exitEditing();
+            await syncPreview(); fCanvas.discardActiveObject().renderAll();
+            document.getElementById('modal-editor').classList.add('hidden'); document.getElementById('modal-editor').classList.remove('flex');
+        };
+
+        // --- SISTEMA UI E DOM-TO-IMAGE ENGINE ---
+        function setAccordionState(button, open) {
+            const panel = button ? button.nextElementSibling : null;
+            if (!button || !panel) return;
+            panel.classList.toggle('hidden', !open);
+            button.querySelector('[data-accordion-icon]').innerText = open ? '-' : '+';
+        }
+        window.toggleAccordion = function(button) { const panel = button.nextElementSibling; setAccordionState(button, panel.classList.contains('hidden')); };
+
+        function enhanceEditorSidebar() {
+            const sidebar = document.querySelector('#sidebar-container');
+            if (!sidebar || sidebar.dataset.accordionReady) return;
+
+            sidebar.innerHTML = `
+                <div>
+                    <h3 class="font-bold text-brand-blue uppercase text-xs border-b-2 border-gray-300 pb-2 mb-3">Modelli Preimpostati</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="border border-gray-300 bg-white p-2 text-[10px] font-bold hover:border-brand-blue" onclick="addPreset('base')">Testo base</button>
+                        <button class="border border-gray-300 bg-white p-2 text-[10px] font-bold hover:border-brand-blue" onclick="addPreset('title')">Titolo grande</button>
+                        <button class="border border-gray-300 bg-brand-blue text-white p-2 text-[10px] font-bold hover:bg-brand-bluedark rounded-md" onclick="addPreset('label')">Etichetta</button>
+                        <button class="border border-gray-300 bg-gray-100 p-2 text-[10px] font-bold italic border-l-4 border-l-brand-yellow hover:bg-gray-200 flex items-center justify-center gap-2" onclick="addPreset('quote')">
+                            <span class="w-1 h-4 bg-brand-yellow block"></span> Citazione
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-300 pt-3">
+                    <input id="overlay-image-upload" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" onchange="handleOverlayImageImport(this)">
+                    <button class="btn-secondary w-full text-[11px] py-2" onclick="document.getElementById('overlay-image-upload').click()">Importa PNG/JPG</button>
+                    <button class="btn-primary w-full text-[11px] py-2 mt-2" onclick="addDecorBox()">Aggiungi riquadro separato</button>
+                </div>
+
+                <div id="object-controls" class="hidden flex-col gap-2 border-t border-gray-300 pt-3">
+                    <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider bg-gray-200 p-2 border-l-4 border-brand-blue">Elemento selezionato</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="duplicateSelectedObject()">Duplica</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="copySelectedObjectToFrame()">Copia in slide</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerH')">Centra H</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerV')">Centra V</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="sendSelectedBackward()">Dietro</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="bringSelectedForward()">Avanti</button>
+                    </div>
+                    <button class="text-red-600 text-[11px] font-bold uppercase py-1 hover:bg-red-50 border border-red-200" onclick="deleteSelectedObject()">Elimina elemento</button>
+                </div>
+
+                <div id="box-controls" class="hidden flex-col gap-3 border-t border-gray-300 pt-3">
+                    <div class="border border-gray-300 bg-white">
+                        <button class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-bold uppercase text-brand-blue bg-gray-100" onclick="toggleAccordion(this)">
+                            Stile Riquadro <span data-accordion-icon>-</span>
+                        </button>
+                        <div class="p-3 space-y-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-600 mb-1">Colore sfondo</label>
+                                <input type="color" id="box-fill" value="#ffffff" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateDecorBoxMetric('fill', this.value)">
+                            </div>
+                            <div>
+                                <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                    <span>Opacità</span> <span id="val-box-opacity">100</span>
+                                </label>
+                                <input type="range" id="rng-box-opacity" min="0" max="100" step="1" value="100" oninput="updateDecorBoxMetric('opacity', this.value)">
+                            </div>
+                            <div>
+                                <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                    <span>Stondamento</span> <span id="val-box-radius">12</span>
+                                </label>
+                                <input type="range" id="rng-box-radius" min="0" max="80" step="1" value="12" oninput="updateDecorBoxMetric('radius', this.value)">
+                            </div>
+                            <div class="bg-blue-50 p-2 border border-blue-200 rounded">
+                                <h5 class="text-[10px] font-bold text-brand-blue mb-2 uppercase">Barre decorative</h5>
+                                <div class="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 mb-2">
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="box-bar-left" onchange="updateDecorBoxMetric('customBoxBarLeft', this.checked)"> Sinistra</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="box-bar-right" onchange="updateDecorBoxMetric('customBoxBarRight', this.checked)"> Destra</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="box-bar-top" onchange="updateDecorBoxMetric('customBoxBarTop', this.checked)"> Alto</label>
+                                    <label class="flex items-center gap-1"><input type="checkbox" id="box-bar-bottom" onchange="updateDecorBoxMetric('customBoxBarBottom', this.checked)"> Basso</label>
+                                </div>
+                                <label class="block text-[10px] font-bold text-gray-600 mb-1">Colore barre</label>
+                                <input type="color" id="box-bar-color" value="#eddc01" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateDecorBoxMetric('customBoxBarColor', this.value)">
+                                <label class="flex justify-between text-[10px] font-bold text-gray-600 mb-1 mt-2">
+                                    <span>Spessore barre</span> <span id="val-box-barwidth">8</span>
+                                </label>
+                                <input type="range" id="rng-box-barwidth" min="1" max="60" step="1" value="8" oninput="updateDecorBoxMetric('customBoxBarWidth', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="text-controls" class="hidden flex-col gap-3 border-t border-gray-300 pt-3">
+                    <div class="border border-gray-300 bg-white">
+                        <button class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-bold uppercase text-brand-blue bg-gray-100" onclick="toggleAccordion(this)">
+                            Editor Testo & Stili <span data-accordion-icon>-</span>
+                        </button>
+                        <div class="p-3 space-y-3">
+                            
+                            <div>
+                                <div id="quill-toolbar" class="bg-gray-100 flex flex-wrap">
+                                    <button class="ql-bold"></button>
+                                    <button class="ql-italic"></button>
+                                    <button class="ql-underline"></button>
+                                    <button class="ql-strike"></button>
+                                </div>
+                                <div id="quill-editor" class="w-full border border-gray-300 bg-white outline-none"></div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-600 mb-1 mt-2">Colore Parole (Selezionate in alto)</label>
+                                <div class="flex gap-1.5 mt-1">
+                                    <button class="w-5 h-5 rounded-full bg-[#111111] border border-gray-300 shadow-sm" onclick="applyQuickColor('#111111')"></button>
+                                    <button class="w-5 h-5 rounded-full bg-[#333333] border border-gray-300 shadow-sm" onclick="applyQuickColor('#333333')"></button>
+                                    <button class="w-5 h-5 rounded-full bg-[#0146bc] border border-gray-300 shadow-sm" onclick="applyQuickColor('#0146bc')"></button>
+                                    <button class="w-5 h-5 rounded-full bg-[#eddc01] border border-gray-300 shadow-sm" onclick="applyQuickColor('#eddc01')"></button>
+                                    <button class="w-5 h-5 rounded-full bg-[#ffffff] border border-gray-300 shadow-sm" onclick="applyQuickColor('#ffffff')"></button>
+                                    <button class="w-5 h-5 rounded-full bg-transparent border border-red-500 flex items-center justify-center text-red-500 text-[10px]" onclick="applyQuickColor(false)">X</button>
+                                </div>
+                            </div>
+
+                            <div class="pt-3 border-t border-gray-200">
+                                <label class="block text-[11px] font-bold text-gray-600 mb-1">Font Family</label>
+                                <select id="font-family" class="w-full border border-gray-300 p-1.5 text-sm bg-white">
+                                    <option value="Montserrat">Montserrat</option>
+                                    <option value="Inter">Inter</option>
+                                    <option value="Nunito">Nunito</option>
+                                    <option value="Arial">Arial</option>
+                                </select>
+                            </div>
+
+                            <div class="flex gap-2">
+                                <div class="flex-1">
+                                    <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                        <span>Grandezza</span><span id="val-fontsize">24</span>
+                                    </label>
+                                    <input type="range" id="rng-fontsize" min="12" max="120" step="1" value="24" oninput="document.getElementById('val-fontsize').innerText = this.value">
+                                </div>
+                                <div class="flex-1">
+                                    <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                        <span>Interlinea</span><span id="val-lineheight">1.2</span>
+                                    </label>
+                                    <input type="range" id="rng-lineheight" min="0.8" max="2.5" step="0.1" value="1.2" oninput="document.getElementById('val-lineheight').innerText = this.value">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
+                                    <span>Larghezza Max (A capo)</span><span id="val-width">600</span>
+                                </label>
+                                <input type="range" id="rng-width" min="100" max="1200" step="10" value="600" oninput="document.getElementById('val-width').innerText = this.value">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-gray-600 mb-1">Allineamento Paragrafi</label>
+                                <div class="flex gap-1">
+                                    <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="document.getElementById('text-align-hidden').value='left';">← Sx</button>
+                                    <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="document.getElementById('text-align-hidden').value='center';">↔ Ctr</button>
+                                    <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="document.getElementById('text-align-hidden').value='right';">Dx →</button>
+                                    <input type="hidden" id="text-align-hidden" value="center">
+                                </div>
+                            </div>
+                            
+                            <div class="pt-3">
+                                <button class="btn-primary w-full bg-brand-yellow text-brand-blue border-brand-yellow hover:bg-yellow-400 font-bold py-3 shadow-md" onclick="applyTextToCanvas()">APPLICA AL CANVAS</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            sidebar.dataset.accordionReady = 'true';
+        }
+
+        function initQuillIfNeeded() {
+            if (!quill && document.getElementById('quill-editor')) {
+                quill = new Quill('#quill-editor', { modules: { toolbar: '#quill-toolbar' }, theme: 'snow' });
+            }
+        }
+
+        window.applyQuickColor = function(hex) {
+            if (!quill) return;
+            if (hex === false) quill.format('color', false);
+            else quill.format('color', hex);
+        };
+
+        function showSelectionPanels(kind) {
+            const textControls = document.getElementById('text-controls');
+            const objectControls = document.getElementById('object-controls');
+            const boxControls = document.getElementById('box-controls');
+
+            if (objectControls) { objectControls.classList.toggle('hidden', !kind); objectControls.classList.toggle('flex', !!kind); }
+            if (textControls) { textControls.classList.toggle('hidden', kind !== 'textbox'); textControls.classList.toggle('flex', kind === 'textbox'); }
+            if (boxControls) { boxControls.classList.toggle('hidden', kind !== 'decorbox'); boxControls.classList.toggle('flex', kind === 'decorbox'); }
+        }
+
+        function syncUIControls() {
+            enhanceEditorSidebar();
+            const obj = fCanvas.getActiveObject();
+            if (!obj) { showSelectionPanels(null); return; }
+
+            if (obj.isCustomTextAsset) {
+                showSelectionPanels('textbox');
+                initQuillIfNeeded();
+                quill.root.innerHTML = obj.sourceHTML || '';
+                if (obj.globalSettings) {
+                    document.getElementById('font-family').value = obj.globalSettings.font;
+                    document.getElementById('rng-fontsize').value = obj.globalSettings.size;
+                    document.getElementById('val-fontsize').innerText = obj.globalSettings.size;
+                    document.getElementById('rng-lineheight').value = obj.globalSettings.lh;
+                    document.getElementById('val-lineheight').innerText = obj.globalSettings.lh;
+                    document.getElementById('rng-width').value = obj.globalSettings.width;
+                    document.getElementById('val-width').innerText = obj.globalSettings.width;
+                    document.getElementById('text-align-hidden').value = obj.globalSettings.align;
+                }
+                return;
+            }
+
+            if (obj.type === 'rect' && obj.isDecorBox) {
+                configureDecorBoxObject(obj); showSelectionPanels('decorbox');
+                document.getElementById('box-fill').value = obj.fill || '#ffffff';
+                document.getElementById('rng-box-opacity').value = Math.round((obj.opacity == null ? 1 : obj.opacity) * 100);
+                document.getElementById('val-box-opacity').innerText = Math.round((obj.opacity == null ? 1 : obj.opacity) * 100);
+                document.getElementById('rng-box-radius').value = obj.rx || 0;
+                document.getElementById('val-box-radius').innerText = obj.rx || 0;
+                document.getElementById('box-bar-left').checked = !!obj.customBoxBarLeft;
+                document.getElementById('box-bar-right').checked = !!obj.customBoxBarRight;
+                document.getElementById('box-bar-top').checked = !!obj.customBoxBarTop;
+                document.getElementById('box-bar-bottom').checked = !!obj.customBoxBarBottom;
+                document.getElementById('box-bar-color').value = obj.customBoxBarColor || '#eddc01';
+                document.getElementById('rng-box-barwidth').value = obj.customBoxBarWidth || 8;
+                document.getElementById('val-box-barwidth').innerText = obj.customBoxBarWidth || 8;
+                return;
+            }
+
+            if (obj.type === 'image' || (obj.type === 'textbox' && !obj.isCustomTextAsset)) {
+                showSelectionPanels('image');
+            }
+        }
+
+        function trimCanvas(canvas) {
+            const ctx = canvas.getContext('2d'); const width = canvas.width; const height = canvas.height;
+            const imageData = ctx.getImageData(0, 0, width, height); const data = imageData.data;
+            let top = null, bottom = null, left = null, right = null;
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const alpha = data[(y * width + x) * 4 + 3];
+                    if (alpha > 0) {
+                        if (top === null) top = y; bottom = y;
+                        if (left === null || x < left) left = x;
+                        if (right === null || x > right) right = x;
+                    }
+                }
+            }
+            if (top === null) return canvas;
+            const p = 6; 
+            top = Math.max(0, top - p); bottom = Math.min(height - 1, bottom + p);
+            left = Math.max(0, left - p); right = Math.min(width - 1, right + p);
+            const trimW = right - left + 1; const trimH = bottom - top + 1;
+            const trimmed = document.createElement('canvas'); trimmed.width = trimW; trimmed.height = trimH;
+            trimmed.getContext('2d').drawImage(canvas, left, top, trimW, trimH, 0, 0, trimW, trimH);
+            return trimmed;
+        }
+
+        window.applyTextToCanvas = async function(isNew = false) {
+            const activeObj = fCanvas.getActiveObject();
+            if (!isNew && (!activeObj || !activeObj.isCustomTextAsset)) return;
+
+            let htmlContent = quill.root.innerHTML;
+            htmlContent = htmlContent.replace(/<p><br><\/p>$/i, '').replace(/<br>$/i, '');
+
+            const gFont = document.getElementById('font-family').value;
+            const gSize = document.getElementById('rng-fontsize').value + 'px';
+            const gLineHeight = document.getElementById('rng-lineheight').value;
+            const gAlign = document.getElementById('text-align-hidden').value || 'center';
+            const gWidth = document.getElementById('rng-width').value + 'px';
+
+            const container = document.getElementById('render-text-container');
+            const content = document.getElementById('render-text-content');
+            
+            content.innerHTML = htmlContent;
+            container.style.fontFamily = gFont; container.style.fontSize = gSize;
+            container.style.lineHeight = gLineHeight; container.style.textAlign = gAlign;
+            container.style.maxWidth = gWidth;
+
+            await new Promise(r => requestAnimationFrame(r));
+            const canvas = await html2canvas(container, { backgroundColor: null, scale: 3, logging: false });
+            const trimmedCanvas = trimCanvas(canvas);
+
+            if (!isNew && activeObj && activeObj.isCustomTextAsset) {
+                const oldLeft = activeObj.left; const oldTop = activeObj.top;
+                fabric.Image.fromURL(trimmedCanvas.toDataURL('image/png'), function(img) {
+                    activeObj.setElement(img.getElement());
+                    activeObj.set({
+                        width: img.width, height: img.height, left: oldLeft, top: oldTop,
+                        sourceHTML: quill.root.innerHTML,
+                        globalSettings: { font: gFont, size: gSize.replace('px',''), lh: gLineHeight, align: gAlign, width: gWidth.replace('px','') }
+                    });
+                    activeObj.setCoords(); fCanvas.requestRenderAll(); debouncedSyncPreview();
+                });
+            } else {
+                fabric.Image.fromURL(trimmedCanvas.toDataURL('image/png'), function(img) {
+                    img.set({
+                        left: fCanvas.width / 2, top: fCanvas.height / 2, originX: 'center', originY: 'center',
+                        scaleX: 1/3, scaleY: 1/3, lockUniScaling: true, isCustomTextAsset: true,
+                        sourceHTML: quill.root.innerHTML,
+                        globalSettings: { font: gFont, size: gSize.replace('px',''), lh: gLineHeight, align: gAlign, width: gWidth.replace('px','') }
+                    });
+                    img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false }); // Blocca distorsione!
+                    fCanvas.add(img); fCanvas.setActiveObject(img); fCanvas.requestRenderAll(); debouncedSyncPreview();
+                });
+            }
+        };
+
+        function configureDecorBoxObject(obj) {
+            if (!obj || obj.type !== 'rect' || !obj.isDecorBox) return;
+            obj.set({ objectCaching: false, lockScalingFlip: true, centeredScaling: false });
+            obj.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, tl: true, tr: true, bl: true, br: true, mtr: true });
+            obj.setCoords();
+        }
+
+        window.addDecorBox = function() {
+            const box = new fabric.Rect({
+                left: fCanvas.getWidth() / 2, top: fCanvas.getHeight() / 2, originX: 'center', originY: 'center',
+                width: Math.min(300, fCanvas.getWidth() * 0.78), height: 110, fill: '#ffffff', opacity: 0.92, rx: 12, ry: 12,
+                isDecorBox: true, customBoxBarLeft: false, customBoxBarRight: false, customBoxBarTop: false, customBoxBarBottom: false,
+                customBoxBarColor: '#eddc01', customBoxBarWidth: 8
+            });
+            configureDecorBoxObject(box); fCanvas.add(box); fCanvas.sendBackwards(box); fCanvas.setActiveObject(box);
+            fCanvas.requestRenderAll(); syncUIControls(); syncPreview();
+        };
+
+        window.updateDecorBoxMetric = function(property, value) {
+            const obj = fCanvas.getActiveObject(); if (!obj || obj.type !== 'rect' || !obj.isDecorBox) return;
+            if (property === 'opacity') { const opacity = Math.max(0, Math.min(100, parseFloat(value) || 0)) / 100; obj.set('opacity', opacity); document.getElementById('val-box-opacity').innerText = Math.round(opacity * 100); }
+            else if (property === 'radius') { const radius = Math.max(0, parseFloat(value) || 0); obj.set({ rx: radius, ry: radius }); document.getElementById('val-box-radius').innerText = radius; }
+            else if (property === 'customBoxBarWidth') { const width = Math.max(1, parseFloat(value) || 1); obj.set(property, width); document.getElementById('val-box-barwidth').innerText = width; }
+            else { obj.set(property, value); }
+            obj.dirty = true; obj.setCoords(); fCanvas.requestRenderAll(); debouncedSyncPreview();
+        };
+
+        window.addPreset = function(type) {
+            initQuillIfNeeded();
+            fCanvas.discardActiveObject();
+
+            if (type === 'label') {
+                const cx = fCanvas.getWidth() / 2; const cy = fCanvas.getHeight() / 2;
+                const box = new fabric.Rect({ left: cx, top: cy, originX: 'center', originY: 'center', width: 260, height: 64, fill: '#0146bc', opacity: 1, rx: 12, ry: 12, isDecorBox: true });
+                configureDecorBoxObject(box); fCanvas.add(box); fCanvas.sendToBack(box);
+                
+                quill.root.innerHTML = '<p><span style="color: #ffffff;">Scrivi Qui</span></p>';
+                document.getElementById('font-family').value = 'Montserrat';
+                document.getElementById('rng-fontsize').value = 24;
+                document.getElementById('text-align-hidden').value = 'center';
+                applyTextToCanvas(true);
+                return;
+            }
+            if (type === 'quote') {
+                const cx = fCanvas.getWidth() / 2; const cy = fCanvas.getHeight() / 2;
+                const box = new fabric.Rect({ left: cx, top: cy, originX: 'center', originY: 'center', width: 340, height: 160, fill: '#ffffff', opacity: 0.96, rx: 16, ry: 16, isDecorBox: true, customBoxBarLeft: true, customBoxBarColor: '#eddc01', customBoxBarWidth: 8 });
+                configureDecorBoxObject(box); fCanvas.add(box); fCanvas.sendToBack(box);
+                
+                // Quote Vettoriali classiche per comodità
+                const openQuote = new fabric.Text('“', { left: cx - 142, top: cy - 48, originX: 'center', originY: 'center', fontSize: 62, fontWeight: 'bold', fill: '#eddc01', fontFamily: 'Montserrat', lockUniScaling: true });
+                const closeQuote = new fabric.Text('”', { left: cx + 142, top: cy + 56, originX: 'center', originY: 'center', fontSize: 62, fontWeight: 'bold', fill: '#eddc01', fontFamily: 'Montserrat', lockUniScaling: true });
+                openQuote.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                closeQuote.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                fCanvas.add(openQuote); fCanvas.add(closeQuote);
+
+                quill.root.innerHTML = '<p>Una frase chiave,<br>chiara e memorabile.</p>';
+                quill.formatText(0, quill.getLength(), 'italic', true);
+                document.getElementById('font-family').value = 'Montserrat';
+                document.getElementById('rng-fontsize').value = 21;
+                applyTextToCanvas(true);
+                return;
+            }
+            if (type === 'title') {
+                quill.root.innerHTML = '<p><span style="color: #0146bc;">TITOLO IN EVIDENZA</span></p>';
+                quill.formatText(0, quill.getLength(), 'bold', true);
+                document.getElementById('font-family').value = 'Montserrat';
+                document.getElementById('rng-fontsize').value = 36;
+                applyTextToCanvas(true);
+                return;
+            }
+            if (type === 'base') {
+                quill.root.innerHTML = '<p>Testo base</p>';
+                document.getElementById('font-family').value = 'Montserrat';
+                document.getElementById('rng-fontsize').value = 24;
+                applyTextToCanvas(true);
+                return;
+            }
+        };
+
+        function configureImageObject(obj) {
+            if (!obj || obj.type !== 'image') return;
+            obj.set({ lockUniScaling: true, lockScalingFlip: true, centeredScaling: false, objectCaching: false });
+            obj.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false, mtr: true }); obj.setCoords();
+        }
+
+        window.handleOverlayImageImport = function(input) {
+            const file = input && input.files && input.files[0]; if (!file || !fCanvas) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                fabric.Image.fromURL(e.target.result, function(img) {
+                    const scale = Math.min((fCanvas.getWidth() * 0.72) / img.width, (fCanvas.getHeight() * 0.72) / img.height, 1);
+                    img.set({ left: fCanvas.getWidth() / 2, top: fCanvas.getHeight() / 2, originX: 'center', originY: 'center', scaleX: scale, scaleY: scale });
+                    configureImageObject(img); fCanvas.add(img); fCanvas.setActiveObject(img); fCanvas.requestRenderAll(); syncUIControls(); syncPreview();
+                });
+            };
+            reader.readAsDataURL(file); input.value = '';
+        };
+
+        window.duplicateSelectedObject = function() {
+            const obj = fCanvas.getActiveObject(); if (!obj) return;
+            obj.clone(function(clone) {
+                clone.set({ left: (obj.left || 0) + 24, top: (obj.top || 0) + 24, evented: true });
+                if (clone.type === 'image' && clone.isCustomTextAsset) clone.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
+                else if (clone.type === 'rect' && clone.isDecorBox) configureDecorBoxObject(clone);
+                else if (clone.type === 'image') configureImageObject(clone);
+                fCanvas.add(clone); fCanvas.setActiveObject(clone); fCanvas.requestRenderAll(); syncUIControls(); syncPreview();
+            }, CUSTOM_FABRIC_PROPS);
+        };
+
+        window.copySelectedObjectToFrame = async function() {
+            const obj = fCanvas && fCanvas.getActiveObject(); if (!obj) return alert("Seleziona un elemento da copiare.");
+            const total = state.finalFramesCount || state.framesData.length || 0; if (total < 2) return alert("Servono almeno due frame.");
+            const suggestedFrame = Math.min(total, currentEditingFrameIndex + 2);
+            const answer = prompt(`Copia l'elemento in quale frame? Inserisci un numero da 1 a ${total}.`, String(suggestedFrame));
+            if (answer === null) return;
+            const targetIndex = (parseInt(answer, 10) || 0) - 1;
+            if (targetIndex < 0 || targetIndex >= total || targetIndex === currentEditingFrameIndex) return alert("Frame non valido.");
+            
+            await syncPreview();
+            const objectData = obj.toObject(CUSTOM_FABRIC_PROPS);
+            objectData.left = (objectData.left || 0) + 16; objectData.top = (objectData.top || 0) + 16; objectData.evented = true;
+            if (!state.framesData[targetIndex]) state.framesData[targetIndex] = {};
+            let targetJSON = state.framesData[targetIndex].fabricJSON || { version: fabric.version, objects: [] };
+            targetJSON.objects.push(objectData); state.framesData[targetIndex].fabricJSON = targetJSON;
+            const dataUrl = await renderFabricLayerDataURL(targetJSON, state.frameWidth, state.viewportHeight, 2);
+            state.framesData[targetIndex].thumbnailBase64 = dataUrl;
+            const thumbImg = document.getElementById(`thumb-img-${targetIndex}`); if (thumbImg) thumbImg.src = dataUrl;
+            alert(`Elemento copiato nel frame ${targetIndex + 1}.`);
+        };
+
+        window.bringSelectedForward = function() { const obj = fCanvas.getActiveObject(); if (!obj) return; fCanvas.bringForward(obj); fCanvas.requestRenderAll(); syncPreview(); };
+        window.sendSelectedBackward = function() { const obj = fCanvas.getActiveObject(); if (!obj) return; fCanvas.sendBackwards(obj); fCanvas.requestRenderAll(); syncPreview(); };
+        window.alignObject = function(mode) { const obj = fCanvas.getActiveObject(); if(obj) { if(mode === 'centerH') fCanvas.viewportCenterObjectH(obj); if(mode === 'centerV') fCanvas.viewportCenterObjectV(obj); obj.setCoords(); fCanvas.requestRenderAll(); syncPreview(); } };
+        window.deleteSelectedObject = function() { const obj = fCanvas.getActiveObject(); if (obj) { fCanvas.remove(obj); showSelectionPanels(null); syncPreview(); } };
+
+        // --- EXPORT CAROUSEL E ZIP ---
+        async function extractFramesAsBlobs(options = {}) {
+            if (fCanvas && currentEditingFrameIndex !== -1) await syncPreview();
+            if (document.fonts && document.fonts.ready) await document.fonts.ready;
+            const mimeType = options.mimeType || 'image/png'; const quality = typeof options.quality === 'number' ? options.quality : 1.0;
+            const blobs = []; const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+            const targetW = 1080; const targetH = 1350; canvas.width = targetW; canvas.height = targetH;
+            ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+
+            for (let i = 0; i < state.finalFramesCount; i++) {
+                ctx.clearRect(0, 0, targetW, targetH); ctx.fillStyle = "white"; ctx.fillRect(0, 0, targetW, targetH);
+                const frameInfo = getFrameInfo(i);
+                if (frameInfo.type === 'image') {
+                    const sourceX = ((frameInfo.imageIndex * state.frameWidth) - state.x) / state.scale;
+                    const sourceY = Math.abs(state.y) / state.scale;
+                    const sourceW = state.frameWidth / state.scale; const sourceH = state.viewportHeight / state.scale;
+                    ctx.drawImage(state.imgObj, sourceX, sourceY, sourceW, sourceH, 0, 0, targetW, targetH);
+                }
+                if (state.framesData[i] && state.framesData[i].fabricJSON) {
+                    const overlayDataUrl = await renderFabricLayerDataURL(state.framesData[i].fabricJSON, targetW, targetH, 2);
+                    const overlayImg = await loadImageFromDataURL(overlayDataUrl); ctx.drawImage(overlayImg, 0, 0, targetW, targetH);
+                }
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, mimeType, quality)); blobs.push(blob);
+            }
+            return blobs;
+        }
+
+        function exportCarousel(btn) {
+            withButtonState(btn, "ZIP...", async () => {
+                const blobs = await extractFramesAsBlobs({ mimeType: 'image/png' }); const zip = new JSZip();
+                blobs.forEach((b, i) => zip.file(`${state.projectName}_${String(i + 1).padStart(2, '0')}.png`, b));
+                const zipBlob = await zip.generateAsync({type: "blob"});
+                const link = document.createElement('a'); link.href = URL.createObjectURL(zipBlob); link.download = `${state.projectName}_carousel.zip`;
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            });
+        }
+
+        function exportProjectJSON(btn) {
+            withButtonState(btn, "Salvataggio...", async () => {
+                const projectData = {
+                    projectName: state.projectName, originalDataUrl: state.originalDataUrl, scale: state.scale, x: state.x, y: state.y,
+                    excludedFrames: state.excludedFrames, leadingBlankFrames: state.leadingBlankFrames || 0, trailingBlankFrames: state.trailingBlankFrames || 0,
+                    framesData: state.framesData
+                };
+                const blob = new Blob([JSON.stringify(projectData)], {type: "application/json"});
+                const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${state.projectName}_backup.json`;
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            });
+        }
+
+        // --- LAYER SFUMATURA (Intatto) ---
+        (function initGradientLayerFeature() {
+            const GRADIENT_LAYER_ID = '__gradient_readability_layer__';
+            const DEFAULT_GRADIENT = { enabled: false, direction: 'bottom', size: 45, color: '#000000', opacity: 65 };
+
+            function getCurrentFrameData() {
+                if (currentEditingFrameIndex === -1) return null;
+                if (!state.framesData[currentEditingFrameIndex]) state.framesData[currentEditingFrameIndex] = {};
+                return state.framesData[currentEditingFrameIndex];
+            }
+
+            function getGradientSettings() {
+                const frameData = getCurrentFrameData(); if (!frameData) return { ...DEFAULT_GRADIENT };
+                frameData.gradientSettings = { ...DEFAULT_GRADIENT, ...(frameData.gradientSettings || {}) };
+                return frameData.gradientSettings;
+            }
+
+            function hexToRgb(hex) {
+                const clean = String(hex || '#000000').replace('#', '');
+                const normalized = clean.length === 3 ? clean.split('').map(ch => ch + ch).join('') : clean.padEnd(6, '0').slice(0, 6);
+                return { r: parseInt(normalized.slice(0, 2), 16) || 0, g: parseInt(normalized.slice(2, 4), 16) || 0, b: parseInt(normalized.slice(4, 6), 16) || 0 };
+            }
+
+            function rgba(hex, alpha) { const rgb = hexToRgb(hex); return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`; }
+
+            function findGradientLayer(canvas) { if (!canvas) return null; return canvas.getObjects().find(obj => obj.isGradientLayer || obj.gradientLayerId === GRADIENT_LAYER_ID) || null; }
+
+            function buildGradientFill(settings, w, h) {
+                const alpha = Math.max(0, Math.min(100, parseFloat(settings.opacity) || 0)) / 100;
+                const solid = rgba(settings.color, alpha); const clear = rgba(settings.color, 0);
+                if (settings.direction === 'top') return new fabric.Gradient({ type: 'linear', coords: { x1: 0, y1: 0, x2: 0, y2: h }, colorStops: [ { offset: 0, color: solid }, { offset: 1, color: clear } ] });
+                if (settings.direction === 'bottom') return new fabric.Gradient({ type: 'linear', coords: { x1: 0, y1: 0, x2: 0, y2: h }, colorStops: [ { offset: 0, color: clear }, { offset: 1, color: solid } ] });
+                if (settings.direction === 'left') return new fabric.Gradient({ type: 'linear', coords: { x1: 0, y1: 0, x2: w, y2: 0 }, colorStops: [ { offset: 0, color: solid }, { offset: 1, color: clear } ] });
+                return new fabric.Gradient({ type: 'linear', coords: { x1: 0, y1: 0, x2: w, y2: 0 }, colorStops: [ { offset: 0, color: clear }, { offset: 1, color: solid } ] });
+            }
+
+            function getGradientGeometry(settings) {
+                const canvasW = fCanvas ? fCanvas.getWidth() : state.frameWidth; const canvasH = fCanvas ? fCanvas.getHeight() : state.viewportHeight;
+                const sizePercent = Math.max(1, Math.min(100, parseFloat(settings.size) || DEFAULT_GRADIENT.size));
+                if (settings.direction === 'top' || settings.direction === 'bottom') { const h = canvasH * (sizePercent / 100); return { left: 0, top: settings.direction === 'bottom' ? canvasH - h : 0, width: canvasW, height: h }; }
+                const w = canvasW * (sizePercent / 100); return { left: settings.direction === 'right' ? canvasW - w : 0, top: 0, width: w, height: canvasH };
+            }
+
+            function configureGradientLayer(layer, settings) {
+                const geometry = getGradientGeometry(settings);
+                layer.set({ left: geometry.left, top: geometry.top, width: geometry.width, height: geometry.height, scaleX: 1, scaleY: 1, fill: buildGradientFill(settings, geometry.width, geometry.height), selectable: false, evented: false, hasControls: false, hasBorders: false, lockMovementX: true, lockMovementY: true, objectCaching: false, isGradientLayer: true, gradientLayerId: GRADIENT_LAYER_ID, gradientConfig: { ...settings } });
+                layer.setCoords();
+            }
+
+            function syncGradientLayer(render = true) {
+                if (!fCanvas) return;
+                const settings = getGradientSettings(); let layer = findGradientLayer(fCanvas);
+                if (!settings.enabled) { if (layer) fCanvas.remove(layer); if (render) fCanvas.requestRenderAll(); return; }
+                if (!layer) { layer = new fabric.Rect({ left: 0, top: 0, width: state.frameWidth, height: state.viewportHeight }); fCanvas.add(layer); }
+                configureGradientLayer(layer, settings); fCanvas.sendToBack(layer);
+                if (render) fCanvas.requestRenderAll();
+            }
+
+            function syncGradientControls() {
+                const settings = getGradientSettings(); const active = document.getElementById('gradient-enabled');
+                if (!active) return;
+                active.checked = !!settings.enabled; document.getElementById('gradient-direction').value = settings.direction;
+                document.getElementById('gradient-size').value = settings.size; document.getElementById('gradient-size-value').innerText = settings.size + '%';
+                document.getElementById('gradient-color').value = settings.color; document.getElementById('gradient-opacity').value = settings.opacity; document.getElementById('gradient-opacity-value').innerText = settings.opacity + '%';
+            }
+
+            function ensureGradientControlsPanel() {
+                if (document.getElementById('gradient-controls')) return;
+                const sidebar = document.querySelector('#sidebar-container'); if (!sidebar) return;
+                const panel = document.createElement('div'); panel.id = 'gradient-controls'; panel.className = 'border border-gray-300 bg-white mt-3';
+                panel.innerHTML = `
+                    <button class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-bold uppercase text-brand-blue bg-gray-100" onclick="toggleAccordion(this)">
+                        Sfumatura leggibilità <span data-accordion-icon>+</span>
+                    </button>
+                    <div class="p-3 space-y-3 hidden">
+                        <label class="flex items-center gap-2 text-[10px] font-bold text-brand-blue uppercase cursor-pointer">
+                            <input type="checkbox" id="gradient-enabled" class="accent-brand-blue" onchange="toggleGradientLayer(this.checked)"> Attiva sfumatura
+                        </label>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 mb-1">Direzione</label>
+                            <select id="gradient-direction" class="w-full border border-gray-300 p-1.5 text-xs bg-white" onchange="updateGradientSetting('direction', this.value)">
+                                <option value="top">Dall'alto</option> <option value="bottom">Dal basso</option> <option value="left">Da sinistra</option> <option value="right">Da destra</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1"><span>Dimensione</span> <span id="gradient-size-value">45%</span></label>
+                            <input type="range" id="gradient-size" min="5" max="100" step="1" value="45" oninput="updateGradientSetting('size', this.value)">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 mb-1">Colore</label>
+                            <input type="color" id="gradient-color" value="#000000" class="w-full h-8 cursor-pointer border-0 p-0" oninput="updateGradientSetting('color', this.value)">
+                            <div class="flex gap-1.5 mt-1">
+                                <button class="w-4 h-4 rounded-full bg-[#000000] border border-gray-300" onclick="applyGradientColor('#000000')"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#333333] border border-gray-300" onclick="applyGradientColor('#333333')"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#0146bc] border border-gray-300" onclick="applyGradientColor('#0146bc')"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#eddc01] border border-gray-300" onclick="applyGradientColor('#eddc01')"></button>
+                                <button class="w-4 h-4 rounded-full bg-[#ffffff] border border-gray-300" onclick="applyGradientColor('#ffffff')"></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1"><span>Intensità</span> <span id="gradient-opacity-value">65%</span></label>
+                            <input type="range" id="gradient-opacity" min="0" max="100" step="1" value="65" oninput="updateGradientSetting('opacity', this.value)">
+                        </div>
+                    </div>
+                `;
+                sidebar.appendChild(panel);
+            }
+
+            window.toggleGradientLayer = function(enabled) { const settings = getGradientSettings(); settings.enabled = !!enabled; syncGradientLayer(); syncGradientControls(); syncPreview(); };
+            window.updateGradientSetting = function(property, value) { const settings = getGradientSettings(); if (property === 'size' || property === 'opacity') { settings[property] = parseFloat(value); } else { settings[property] = value; } settings.enabled = true; const active = document.getElementById('gradient-enabled'); if (active) active.checked = true; syncGradientLayer(); syncGradientControls(); syncPreview(); };
+            window.applyGradientColor = function(hex) { const color = document.getElementById('gradient-color'); if (color) color.value = hex; updateGradientSetting('color', hex); };
+
+            const originalInitFabricCanvas = initFabricCanvas;
+            initFabricCanvas = function() { originalInitFabricCanvas(); ensureGradientControlsPanel(); syncGradientControls(); };
+
+            const originalOpenAdvancedTextEditor = window.openAdvancedTextEditor;
+            window.openAdvancedTextEditor = function(frameIndex) {
+                originalOpenAdvancedTextEditor(frameIndex);
+                setTimeout(() => {
+                    ensureGradientControlsPanel(); const frameData = getCurrentFrameData(); const existingLayer = findGradientLayer(fCanvas);
+                    if (existingLayer && existingLayer.gradientConfig) { frameData.gradientSettings = { ...DEFAULT_GRADIENT, ...existingLayer.gradientConfig }; } else { frameData.gradientSettings = { ...DEFAULT_GRADIENT, ...(frameData.gradientSettings || {}) }; }
+                    syncGradientLayer(); syncGradientControls();
+                }, 150);
+            };
+
+            const originalGetFrameFabricJSON = getFrameFabricJSON;
+            getFrameFabricJSON = function(canvas) { syncGradientLayer(false); return originalGetFrameFabricJSON(canvas); };
+
+            const originalAddPreset = window.addPreset;
+            window.addPreset = function(type) { originalAddPreset(type); syncGradientLayer(false); };
+
+            const originalSyncUIControls = syncUIControls;
+            syncUIControls = function() { syncGradientLayer(false); originalSyncUIControls(); ensureGradientControlsPanel(); syncGradientControls(); };
+
+            const originalDeleteSelectedObject = window.deleteSelectedObject;
+            window.deleteSelectedObject = function() { const obj = fCanvas ? fCanvas.getActiveObject() : null; if (obj && obj.isGradientLayer) return; originalDeleteSelectedObject(); syncGradientLayer(false); };
+        })();
+
+        // --- PLAYGROUND INSTAGRAM ---
+        function openPlayground(btn) {
+            withButtonState(btn, "Caricamento...", async () => {
+                const container = document.getElementById('playground-container');
+                container.innerHTML = ''; container.scrollLeft = 0; 
+                const blobs = await extractFramesAsBlobs();
+                for (const blob of blobs) {
+                    const img = document.createElement('img'); img.src = URL.createObjectURL(blob); img.className = "snap-item flex-none"; container.appendChild(img);
+                }
+                document.getElementById('modal-playground').classList.remove('hidden'); document.getElementById('modal-playground').classList.add('flex');
+            });
+        }
+        function closePlayground() {
+            document.getElementById('modal-playground').classList.add('hidden'); document.getElementById('modal-playground').classList.remove('flex');
+            const imgs = document.getElementById('playground-container').getElementsByTagName('img');
+            for(let img of imgs) URL.revokeObjectURL(img.src);
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Carousel Asset Generator Pro</title>
     
     <link rel="icon" href="favicon.ico">
