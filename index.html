@@ -542,7 +542,7 @@
             state.y = Math.max(minY, Math.min(0, parseFloat(sliderY.value) || 0));
             sliderX.value = state.x; sliderY.value = state.y;
 
-            document.getElementById('preview-img').style.transform = `translate(${state.x + ((state.leadingBlankFrames || 0) * state.frameWidth)}px, ${state.y}px) scale(${state.scale})`;
+            document.getElementById('preview-img').style.display = 'none'; // Nascondiamo l'immagine globale
             document.getElementById('crop-area').style.width = `${totalActiveWidth}px`;
             
             const gridContainer = document.getElementById('grid-container');
@@ -557,11 +557,23 @@
                 if (i > 0) borderClass += ' border-l-2 border-dashed border-l-brand-yellow/70';
 
                 const frameBgClass = frameInfo.type === 'blank' ? 'bg-white' : 'bg-black/5';
-                frame.className = `${borderClass} flex items-center justify-center ${frameBgClass} flex-shrink-0 relative group pointer-events-auto cursor-default`;
+                frame.className = `${borderClass} flex items-center justify-center ${frameBgClass} flex-shrink-0 relative group pointer-events-auto cursor-default overflow-hidden`;
                 
+                // --- FIX: Inseriamo il frammento di sfondo nel singolo frame ---
+                if (frameInfo.type === 'image' && state.imgObj) {
+                    const bgContainer = document.createElement('div');
+                    bgContainer.className = 'absolute inset-0 overflow-hidden z-0 pointer-events-none';
+                    const bgImg = document.createElement('img');
+                    bgImg.src = state.imgObj.src;
+                    bgImg.className = 'absolute max-w-none origin-top-left pointer-events-none';
+                    bgImg.style.transform = `translate(${state.x - (frameInfo.imageIndex * state.frameWidth)}px, ${state.y}px) scale(${state.scale})`;
+                    bgContainer.appendChild(bgImg);
+                    frame.appendChild(bgContainer);
+                }
+
                 const thumbImg = document.createElement('img');
                 thumbImg.id = `thumb-img-${i}`;
-                thumbImg.className = 'absolute inset-0 w-full h-full pointer-events-none z-0 object-contain';
+                thumbImg.className = 'absolute inset-0 w-full h-full pointer-events-none z-10 object-contain';
                 
                 if(state.framesData[i] && state.framesData[i].thumbnailBase64) {
                     thumbImg.src = state.framesData[i].thumbnailBase64;
@@ -571,11 +583,11 @@
                 }
 
                 const label = document.createElement('span');
-                label.className = 'absolute bottom-3 left-3 bg-brand-yellow text-brand-blue font-bold text-lg px-3 py-1 z-10 pointer-events-none shadow-md';
+                label.className = 'absolute bottom-3 left-3 bg-brand-yellow text-brand-blue font-bold text-lg px-3 py-1 z-20 pointer-events-none shadow-md';
                 label.innerText = i + 1;
 
                 const editBtn = document.createElement('button');
-                editBtn.className = 'absolute bottom-3 right-3 bg-brand-blue text-white py-1.5 px-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20 cursor-pointer shadow-md hover:bg-brand-bluedark flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider border border-white/20';
+                editBtn.className = 'absolute bottom-3 right-3 bg-brand-blue text-white py-1.5 px-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-30 cursor-pointer shadow-md hover:bg-brand-bluedark flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider border border-white/20';
                 editBtn.innerHTML = `EDIT SLIDE`;
                 editBtn.onclick = () => openAdvancedTextEditor(i);
                 
