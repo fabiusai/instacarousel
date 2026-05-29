@@ -407,7 +407,7 @@
             fabric.Rect.prototype._decorBoxRenderPatched = true;
         }
 
-                var state = window.__carouselGeneratorState || (window.__carouselGeneratorState = {
+                                var state = window.__carouselGeneratorState || (window.__carouselGeneratorState = {
             projectName: '',
             imgObj: null,
             originalDataUrl: null,
@@ -426,6 +426,224 @@
             framesData: [],
             get frameWidth() { return this.viewportHeight * (4/5); }
         });
+
+        var undoStack = [];
+        var undoRestoring = false;
+        var undoLimit = 30;
+        var fabricUndoHookInstalled = false;
+
+        function cloneForUndo(value) {
+            return JSON.parse(JSON.stringify(value));
+        }
+
+        function getUndoSnapshot() {
+            const framesData = cloneForUndo(state.framesData || []);
+
+            if (fCanvas && currentEditingFrameIndex !== -1 && framesData[currentEditingFrameIndex]) {
+                framesData[currentEditingFrameIndex].fabricJSON = getFrameFabricJSON(fCanvas);
+                delete framesData[currentEditingFrameIndex].thumbnailBase64;
+            }
+
+            return {
+                projectName: state.projectName,
+                originalDataUrl: state.originalDataUrl,
+                baseScale: state.baseScale,
+                scale: state.scale,
+                x: state.x,
+                y: state.y,
+                maxPossibleFrames: state.maxPossibleFrames,
+                imageFramesCount: state.imageFramesCount,
+                leadingBlankFrames: state.leadingBlankFrames || 0,
+                trailingBlankFrames: state.trailingBlankFrames || 0,
+                excludedFrames: state.excludedFrames || 0,
+                finalFramesCount: state.finalFramesCount || 1,
+                framesData: framesData,
+                currentEditingFrameIndex: currentEditingFrameIndex
+            };
+        }
+
+        function updateUndoButtons() {
+            document.querySelectorAll('[data-undo-button]').forEach(button => {
+                button.disabled = undoStack.length === 0;
+                button.classList.toggle('opacity-50', undoStack.length === 0);
+                button.classList.toggle('cursor-not-allowed', undoStack.length === 0);
+            });
+        }
+
+        function saveUndoSnapshot() {
+            if (undoRestoring || !state.originalDataUrl) return;
+
+            const snapshot = getUndoSnapshot();
+            const snapshotKey = JSON.stringify(snapshot);
+            const last = undoStack[undoStack.length - 1];
+
+            if (last && last._key === snapshotKey) return;
+
+            snapshot._key = snapshotKey;
+            undoStack.push(snapshot);
+
+            if (undoStack.length > undoLimit) {
+                undoStack.shift();
+            }
+
+            updateUndoButtons();
+        }
+
+        function restoreImageForUndo(dataUrl) {
+            return new Promise(resolve => {
+                if (!dataUrl) {
+                    state.imgObj = null;
+                    resolve();
+                    return;
+                }
+
+                const img = new Image();
+                img.onload = () => {
+                    state.imgObj = img;
+                    resolve();
+                };
+                img.src = dataUrl;
+            });
+        }
+
+        window.undoLastOperation = async function() {
+            if (!undoStack.length) return;
+
+            const snapshot = undoStack.pop();
+            undoRestoring = true;
+
+            await restoreImageForUndo(snapshot.originalDataUrl);
+
+            state.projectName = snapshot.projectName;
+            state.originalDataUrl = snapshot.originalDataUrl;
+            state.baseScale = snapshot.baseScale;
+            state.scale = snapshot.scale;
+            state.x = snapshot.x;
+            state.y = snapshot.y;
+            state.maxPossibleFrames = snapshot.maxPossibleFrames;
+            state.imageFramesCount = snapshot.imageFramesCount;
+            state.leadingBlankFrames = snapshot.leadingBlankFrames || 0;
+            state.trailingBlankFrames = snapshot.trailingBlankFrames || 0;
+            state.excludedFrames = snapshot.excludedFrames || 0;
+            state.finalFramesCount = snapshot.finalFramesCount || 1;
+            state.framesData = cloneForUndo(snapshot.framesData || []);
+            state.isRestoring = true;
+
+            const projectLabel = document.getElementById('display-project-name');
+            if (projectLabel) projectLabel.innerText = "Progetto: " + state.projectName;
+
+            if (state.imgObj) {
+                restoreEditorUI();
+            }
+
+            const editorModal = document.getElementById('modal-editor');
+            if (editorModal && !editorModal.classList.contains('hidden') && snapshot.currentEditingFrameIndex !== -1) {
+                currentEditingFrameIndex = snapshot.currentEditingFrameIndex;
+                openAdvancedTextEditor(currentEditingFrameIndex);
+            }
+
+            undoRestoring = false;
+            updateUndoButtons();
+        };
+
+        function shouldTrackUndoTarget(target) {
+            const el = target.closest('button, input, select, textarea, [contenteditable="true"], canvas');
+            if (!el || el.dataset.undoButton !== undefined) return false;
+
+            const action = [
+                el.getAttribute('onclick') || '',
+                el.getAttribute('oninput') || '',
+                el.getAttribute('onchange') || ''
+            ].join(' ');
+
+            if (/exportCarousel|exportProjectJSON|openPlayground|closePlayground|closeAdvancedEditor|syncPreview|document\.getElementById/.test(action)) {
+                return false;
+            }
+
+            return /addBlankFrame|removeBlankFrame|handleReplaceMainImage|addPreset|addDecorBox|handleOverlayImageImport|duplicateSelectedObject|copySelectedObjectToFrame|bringSelectedForward|sendSelectedBackward|alignObject|deleteSelectedObject|updateSelectedObject|updateSelectedText|updateTextMetric|updateDecorBoxMetric|toggleText|clearSelectedTextStyle|applyQuickColor|toggleGradientLayer|updateGradientSetting|applyGradientColor/.test(action)
+                || el.id === 'fabric-canvas'
+                || el.isContentEditable;
+        }
+
+        function installUndoControls() {
+            if (!document.getElementById('btn-undo-main')) {
+                const exportArea = document.querySelector('button[onclick="openPlayground(this)"]');
+                if (exportArea) {
+                    const button = document.createElement('button');
+                    button.id = 'btn-undo-main';
+                    button.dataset.undoButton = '';
+                    button.className = 'btn-secondary w-full text-[11px] py-2';
+                    button.type = 'button';
+                    button.textContent = 'Annulla ultima operazione';
+                    button.onclick = undoLastOperation;
+                    exportArea.insertAdjacentElement('beforebegin', button);
+                }
+            }
+
+            if (!document.getElementById('btn-undo-editor')) {
+                const modalActions = document.querySelector('#modal-editor .absolute.top-6.right-6');
+                if (modalActions) {
+                    const button = document.createElement('button');
+                    button.id = 'btn-undo-editor';
+                    button.dataset.undoButton = '';
+                    button.className = 'bg-gray-100 text-brand-blue hover:bg-white border-2 border-white font-bold text-xs px-4 py-2 uppercase tracking-widest transition-colors shadow-lg';
+                    button.type = 'button';
+                    button.textContent = 'Annulla';
+                    button.onclick = undoLastOperation;
+                    modalActions.insertAdjacentElement('afterbegin', button);
+                }
+            }
+
+            updateUndoButtons();
+        }
+
+        document.addEventListener('pointerdown', event => {
+            if (shouldTrackUndoTarget(event.target)) saveUndoSnapshot();
+        }, true);
+
+        document.addEventListener('change', event => {
+            if (shouldTrackUndoTarget(event.target)) saveUndoSnapshot();
+        }, true);
+
+        document.addEventListener('keydown', event => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+                event.preventDefault();
+                undoLastOperation();
+                return;
+            }
+
+            if (shouldTrackUndoTarget(event.target)) saveUndoSnapshot();
+        }, true);
+
+        const originalInitFabricCanvasForUndo = initFabricCanvas;
+        initFabricCanvas = function() {
+            originalInitFabricCanvasForUndo();
+
+            if (fabricUndoHookInstalled || !fCanvas) return;
+            fabricUndoHookInstalled = true;
+
+            fCanvas.on('mouse:down', event => {
+                if (event.target) saveUndoSnapshot();
+            });
+
+            fCanvas.on('object:added', () => {
+                updateUndoButtons();
+            });
+
+            fCanvas.on('object:removed', () => {
+                updateUndoButtons();
+            });
+
+            fCanvas.on('object:modified', () => {
+                updateUndoButtons();
+            });
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', installUndoControls);
+        } else {
+            installUndoControls();
+        }
 
         window.addEventListener('resize', () => {
             state.viewportHeight = window.innerWidth < 768 ? 350 : 500;
