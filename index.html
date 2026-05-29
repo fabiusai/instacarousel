@@ -146,7 +146,12 @@
                             <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1 hover:bg-gray-100" onclick="removeBlankFrame('before')">- Prima</button>
                             <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1 hover:bg-gray-100" onclick="removeBlankFrame('after')">- Dopo</button>
                         </div>
-                        <p class="text-[10px] text-gray-600">Vuoti: <span id="blank-before-value">0</span> prima / <span id="blank-after-value">0</span> dopo</p>
+                        <p class="text-[10px] text-gray-600 mb-2">Vuoti: <span id="blank-before-value">0</span> prima / <span id="blank-after-value">0</span> dopo</p>
+                        
+                        <div class="border-t border-gray-300 pt-3 mt-1">
+                            <input type="file" id="import-module-upload" class="hidden" accept=".json" onchange="handleImportModuleJSON(event)">
+                            <button class="btn-secondary w-full text-[10px] py-2 bg-blue-50" onclick="document.getElementById('import-module-upload').click()">⬇️ Appendi Modulo (.JSON)</button>
+                        </div>
                     </div>
                     
                     <div class="mt-6 pt-5 border-t-2 border-gray-300 flex flex-col gap-3">
@@ -486,6 +491,86 @@
             };
             reader.readAsText(file);
         }
+
+        window.handleImportModuleJSON = function(event) {
+            const file = event.target.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    let framesToAdd = [];
+                    let originalImage = null;
+                    
+                    if (data.framesData && Array.isArray(data.framesData)) { framesToAdd = data.framesData; } 
+                    else if (data.objects) { framesToAdd = [{ fabricJSON: data }]; }
+
+                    if (framesToAdd.length === 0) return alert("Nessun contenuto valido trovato nel JSON.");
+
+                    // Precarichiamo l'immagine madre del modulo, se esiste
+                    if (data.originalDataUrl) {
+                        originalImage = await new Promise(res => {
+                            const img = new Image();
+                            img.onload = () => res(img);
+                            img.onerror = () => res(null);
+                            img.src = data.originalDataUrl;
+                        });
+                    }
+
+                    saveUndoSnapshot(); 
+                    ensureFramesData();
+
+                    let origImageFramesCount = data.imageFramesCount || Math.max(1, (data.maxPossibleFrames || 1) - (data.excludedFrames || 0));
+                    let origImageIndex = 0;
+
+                    for (let i = 0; i < framesToAdd.length; i++) {
+                        let f = framesToAdd[i];
+                        let isOrigBlank = f.isBlankFrame;
+                        
+                        let newFabricJSON = f.fabricJSON ? JSON.parse(JSON.stringify(f.fabricJSON)) : { version: fabric.version || "5.3.0", objects: [] };
+                        if (!newFabricJSON.objects) newFabricJSON.objects = [];
+
+                        // Se la slide del modulo aveva un ritaglio della foto madre, lo "congeliamo" come livello di sfondo statico
+                        if (!isOrigBlank && originalImage && origImageIndex < origImageFramesCount) {
+                            const imgX = (data.x || 0) - (origImageIndex * state.frameWidth);
+                            const imgY = data.y || 0;
+                            
+                            const bgObj = {
+                                type: 'image',
+                                originX: 'left',
+                                originY: 'top',
+                                left: imgX,
+                                top: imgY,
+                                width: originalImage.naturalWidth || originalImage.width,
+                                height: originalImage.naturalHeight || originalImage.height,
+                                scaleX: data.scale || 1,
+                                scaleY: data.scale || 1,
+                                src: data.originalDataUrl,
+                                lockUniScaling: true,
+                                lockScalingFlip: true,
+                                objectCaching: false,
+                                selectable: false,  // Impedisce spostamenti accidentali
+                                evented: false,
+                                hasControls: false
+                            };
+                            
+                            newFabricJSON.objects.unshift(bgObj); // Inserito in fondo allo stack
+                            origImageIndex++;
+                        }
+
+                        state.trailingBlankFrames = (state.trailingBlankFrames || 0) + 1;
+                        state.framesData.push({ 
+                            isBlankFrame: true, // Appeso al nuovo progetto vive di vita propria
+                            fabricJSON: newFabricJSON,
+                            thumbnailBase64: f.thumbnailBase64 || null
+                        });
+                    }
+
+                    updateEditorState();
+                } catch(err) { alert("Errore lettura modulo JSON: " + err.message); }
+                event.target.value = ''; 
+            };
+            reader.readAsText(file);
+        };
 
         function initEditor() {
             document.getElementById('section-upload').classList.add('hidden'); document.getElementById('section-editor').classList.remove('hidden'); document.getElementById('section-editor').classList.add('flex');
