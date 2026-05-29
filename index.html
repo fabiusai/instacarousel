@@ -42,10 +42,7 @@
     </script>
 
     <style>
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]:focus { outline: none; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; background: #0146bc; cursor: pointer; border-radius: 50%; margin-top: -6px; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #cbd5e1; border-radius: 2px; }
+        input[type=range] { width: 100%; accent-color: #0146bc; cursor: pointer; }
         
         .snap-container { scroll-snap-type: x mandatory; overflow-x: auto; scrollbar-width: none; }
         .snap-container::-webkit-scrollbar { display: none; }
@@ -58,12 +55,10 @@
         
         .canvas-container { margin: 0 auto; }
         
-        /* FIX Quill per farlo sembrare integrato nella UI Poste */
         .ql-toolbar.ql-snow { border: none !important; border-bottom: 1px solid #e5e7eb !important; padding: 4px !important; }
         .ql-container.ql-snow { border: none !important; font-family: inherit; font-size: 14px; }
         .ql-editor { padding: 8px !important; min-height: 80px; }
 
-        /* Teatro di posa nascosto */
         #render-stage { position: absolute; left: -9999px; top: -9999px; z-index: -1; pointer-events: none; }
         #render-text-container { display: inline-block; padding: 4px; white-space: pre-wrap; word-wrap: break-word; }
         #render-text-content p { margin: 0 !important; padding: 0 !important; line-height: inherit; }
@@ -175,7 +170,7 @@
 
     <div id="modal-editor" class="fixed inset-0 z-50 bg-gray-900/95 hidden flex-col justify-center items-center p-4">
         <div class="absolute top-6 right-6 flex gap-3">
-            <button class="bg-gray-100 text-brand-blue hover:bg-white border-2 border-white font-bold text-xs px-4 py-2 uppercase tracking-widest transition-colors shadow-lg" onclick="syncPreview()">↻ Aggiorna Preview</button>
+            <button class="bg-gray-100 text-red-600 hover:bg-white border-2 border-white font-bold text-xs px-4 py-2 uppercase tracking-widest transition-colors shadow-lg" onclick="closeWithoutSaving()">Chiudi senza salvare</button>
             <button class="bg-brand-yellow text-brand-blue hover:bg-white font-bold text-sm px-6 py-2 uppercase tracking-widest transition-colors shadow-lg" onclick="closeAdvancedEditor()">Salva e Chiudi</button>
         </div>
         
@@ -211,9 +206,6 @@
     </div>
 
     <script>
-        // --- OVERRIDE FABRIC.JS (Compatibilità vecchi JSON) ---
-        // Manteniamo questi overrides SOLO per retrocompatibilità qualora l'utente carichi un vecchio file JSON
-        // basato su fabric.Textbox. I nuovi testi utilizzeranno il motore a Immagine (DOM-to-Image).
         if (!fabric.Rect.prototype._decorBoxRenderPatched) {
             fabric.Rect.prototype._decorBoxOriginalRender = fabric.Rect.prototype._render;
             fabric.Rect.prototype._render = function(ctx) {
@@ -231,7 +223,6 @@
             fabric.Rect.prototype._decorBoxRenderPatched = true;
         }
 
-        // --- STATO DEL PROGETTO ---
         var state = window.__carouselGeneratorState || (window.__carouselGeneratorState = {
             projectName: '', imgObj: null, originalDataUrl: null, baseScale: 1, scale: 1, x: 0, y: 0,
             maxPossibleFrames: 1, imageFramesCount: 1, leadingBlankFrames: 0, trailingBlankFrames: 0,
@@ -242,16 +233,16 @@
 
         var fCanvas = null;
         var currentEditingFrameIndex = -1;
+        var frameBackup = null; 
         var quill = null;
         var previewTimeout = null;
 
         var CUSTOM_FABRIC_PROPS = [
-            'isDecorBox', 'customBoxBarLeft', 'customBoxBarRight', 'customBoxBarTop', 'customBoxBarBottom',
+            'isDecorBox', 'isDecorCircle', 'customBoxBarLeft', 'customBoxBarRight', 'customBoxBarTop', 'customBoxBarBottom',
             'customBoxBarColor', 'customBoxBarWidth', 'isGradientLayer', 'gradientLayerId', 'gradientConfig',
             'isCustomTextAsset', 'sourceHTML', 'globalSettings'
         ];
 
-        // --- SISTEMA DI UNDO / REDO ---
         var undoStack = [];
         var undoRestoring = false;
         var undoLimit = 30;
@@ -317,8 +308,8 @@
             const el = target.closest('button, input, select, textarea, [contenteditable="true"], canvas');
             if (!el || el.dataset.undoButton !== undefined) return false;
             const action = [el.getAttribute('onclick') || '', el.getAttribute('oninput') || '', el.getAttribute('onchange') || ''].join(' ');
-            if (/exportCarousel|exportProjectJSON|openPlayground|closePlayground|closeAdvancedEditor|syncPreview/.test(action)) return false;
-            return /addBlankFrame|removeBlankFrame|handleReplaceMainImage|addPreset|addDecorBox|handleOverlayImageImport|duplicateSelectedObject|copySelectedObjectToFrame|bringSelectedForward|sendSelectedBackward|alignObject|deleteSelectedObject|applyTextToCanvas|applyQuickColor/.test(action) || el.id === 'fabric-canvas' || el.isContentEditable;
+            if (/exportCarousel|exportProjectJSON|openPlayground|closePlayground|closeAdvancedEditor|closeWithoutSaving/.test(action)) return false;
+            return /addBlankFrame|removeBlankFrame|handleReplaceMainImage|addPreset|addDecorBox|addDecorCircle|handleOverlayImageImport|duplicateSelectedObject|copySelectedObjectToFrame|bringSelectedForward|sendSelectedBackward|alignObject|deleteSelectedObject|applyTextToCanvas|applyQuickColor/.test(action) || el.id === 'fabric-canvas' || el.isContentEditable;
         }
 
         function installUndoControls() {
@@ -363,7 +354,6 @@
         if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', installUndoControls); } else { installUndoControls(); }
         window.addEventListener('resize', () => { state.viewportHeight = window.innerWidth < 768 ? 350 : 500; if(state.imgObj) { state.isRestoring = true; restoreEditorUI(); } });
 
-        // --- INIZIALIZZAZIONE PROGETTO ---
         async function withButtonState(btn, activeText, workFn) {
             const originalText = btn.innerHTML; btn.innerHTML = activeText; btn.disabled = true;
             try { await workFn(); btn.innerHTML = "Fatto!"; setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 2000); } 
@@ -668,6 +658,15 @@
             currentEditingFrameIndex = frameIndex; initFabricCanvas(); fCanvas.clear();
             fCanvas.setWidth(state.frameWidth); fCanvas.setHeight(state.viewportHeight);
             
+            // Crea un salvataggio temporaneo nel caso in cui si voglia chiudere senza salvare
+            frameBackup = null;
+            if (state.framesData[frameIndex]) {
+                frameBackup = {
+                    fabricJSON: state.framesData[frameIndex].fabricJSON ? JSON.parse(JSON.stringify(state.framesData[frameIndex].fabricJSON)) : null,
+                    thumbnailBase64: state.framesData[frameIndex].thumbnailBase64 || null
+                };
+            }
+            
             const tempCanvas = document.createElement('canvas'); tempCanvas.width = state.frameWidth; tempCanvas.height = state.viewportHeight;
             const ctx = tempCanvas.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
             const frameInfo = getFrameInfo(frameIndex); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, state.frameWidth, state.viewportHeight);
@@ -680,16 +679,39 @@
                 ctx.drawImage(state.imgObj, sourceX, sourceY, sourceW, sourceH, 0, 0, state.frameWidth, state.viewportHeight);
             }
             
-            fabric.Image.fromURL(tempCanvas.toDataURL('image/png'), function(img) { fCanvas.setBackgroundImage(img, fCanvas.renderAll.bind(fCanvas)); });
             document.getElementById('modal-editor').classList.remove('hidden'); document.getElementById('modal-editor').classList.add('flex');
-            
             enhanceEditorSidebar(); showSelectionPanels(null);
-            if (state.framesData[frameIndex] && state.framesData[frameIndex].fabricJSON) {
-                fCanvas.loadFromJSON(state.framesData[frameIndex].fabricJSON, () => {
-                    fCanvas.setBackgroundImage(fCanvas.backgroundImage, fCanvas.renderAll.bind(fCanvas));
-                    prepareFabricForSave(fCanvas);
-                });
+            
+            fabric.Image.fromURL(tempCanvas.toDataURL('image/png'), function(img) { 
+                fCanvas.setBackgroundImage(img, function() {
+                    if (state.framesData[frameIndex] && state.framesData[frameIndex].fabricJSON) {
+                        fCanvas.loadFromJSON(state.framesData[frameIndex].fabricJSON, () => {
+                            fCanvas.setBackgroundImage(img, fCanvas.renderAll.bind(fCanvas));
+                            prepareFabricForSave(fCanvas);
+                        });
+                    } else {
+                        fCanvas.renderAll();
+                    }
+                }); 
+            });
+        };
+
+        window.closeWithoutSaving = function() {
+            if (fCanvas && fCanvas.getActiveObject() && fCanvas.getActiveObject().isEditing) fCanvas.getActiveObject().exitEditing();
+            fCanvas.discardActiveObject().renderAll();
+            
+            if (currentEditingFrameIndex !== -1 && frameBackup) {
+                if (!state.framesData[currentEditingFrameIndex]) state.framesData[currentEditingFrameIndex] = {};
+                state.framesData[currentEditingFrameIndex].fabricJSON = frameBackup.fabricJSON;
+                state.framesData[currentEditingFrameIndex].thumbnailBase64 = frameBackup.thumbnailBase64;
+                
+                const thumbImg = document.getElementById(`thumb-img-${currentEditingFrameIndex}`);
+                if (thumbImg && frameBackup.thumbnailBase64) {
+                    thumbImg.src = frameBackup.thumbnailBase64;
+                }
             }
+            
+            document.getElementById('modal-editor').classList.add('hidden'); document.getElementById('modal-editor').classList.remove('flex');
         };
 
         window.closeAdvancedEditor = async function() {
@@ -698,7 +720,6 @@
             document.getElementById('modal-editor').classList.add('hidden'); document.getElementById('modal-editor').classList.remove('flex');
         };
 
-        // --- SISTEMA UI E DOM-TO-IMAGE ENGINE ---
         function setAccordionState(button, open) {
             const panel = button ? button.nextElementSibling : null;
             if (!button || !panel) return;
@@ -727,7 +748,10 @@
                 <div class="border-t border-gray-300 pt-3">
                     <input id="overlay-image-upload" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" onchange="handleOverlayImageImport(this)">
                     <button class="btn-secondary w-full text-[11px] py-2" onclick="document.getElementById('overlay-image-upload').click()">Importa PNG/JPG</button>
-                    <button class="btn-primary w-full text-[11px] py-2 mt-2" onclick="addDecorBox()">Aggiungi riquadro separato</button>
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <button class="btn-primary text-[10px] py-2" onclick="addDecorBox()">+ Riquadro</button>
+                        <button class="btn-primary text-[10px] py-2 bg-brand-yellow text-brand-blue border-brand-yellow hover:bg-yellow-400" onclick="addDecorCircle()">+ Cerchio</button>
+                    </div>
                 </div>
 
                 <div id="object-controls" class="hidden flex-col gap-2 border-t border-gray-300 pt-3">
@@ -746,7 +770,7 @@
                 <div id="box-controls" class="hidden flex-col gap-3 border-t border-gray-300 pt-3">
                     <div class="border border-gray-300 bg-white">
                         <button class="w-full flex items-center justify-between px-3 py-2 text-left text-xs font-bold uppercase text-brand-blue bg-gray-100" onclick="toggleAccordion(this)">
-                            Stile Riquadro <span data-accordion-icon>-</span>
+                            Stile Riquadro/Cerchio <span data-accordion-icon>-</span>
                         </button>
                         <div class="p-3 space-y-3">
                             <div>
@@ -759,13 +783,13 @@
                                 </label>
                                 <input type="range" id="rng-box-opacity" min="0" max="100" step="1" value="100" oninput="updateDecorBoxMetric('opacity', this.value)">
                             </div>
-                            <div>
+                            <div id="radius-control-group">
                                 <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
                                     <span>Stondamento</span> <span id="val-box-radius">12</span>
                                 </label>
                                 <input type="range" id="rng-box-radius" min="0" max="80" step="1" value="12" oninput="updateDecorBoxMetric('radius', this.value)">
                             </div>
-                            <div class="bg-blue-50 p-2 border border-blue-200 rounded">
+                            <div id="bars-control-group" class="bg-blue-50 p-2 border border-blue-200 rounded">
                                 <h5 class="text-[10px] font-bold text-brand-blue mb-2 uppercase">Barre decorative</h5>
                                 <div class="grid grid-cols-2 gap-2 text-[10px] font-bold text-gray-600 mb-2">
                                     <label class="flex items-center gap-1"><input type="checkbox" id="box-bar-left" onchange="updateDecorBoxMetric('customBoxBarLeft', this.checked)"> Sinistra</label>
@@ -798,7 +822,7 @@
                                     <button class="ql-underline"></button>
                                     <button class="ql-strike"></button>
                                 </div>
-                                <div id="quill-editor" class="w-full border border-gray-300 bg-white outline-none"></div>
+                                <div id="quill-editor" class="w-full border border-gray-300 bg-gray-200 outline-none"></div>
                             </div>
 
                             <div>
@@ -909,20 +933,30 @@
                 return;
             }
 
-            if (obj.type === 'rect' && obj.isDecorBox) {
-                configureDecorBoxObject(obj); showSelectionPanels('decorbox');
+            if ((obj.type === 'rect' && obj.isDecorBox) || (obj.type === 'circle' && obj.isDecorCircle)) {
+                if (obj.isDecorBox) configureDecorBoxObject(obj);
+                showSelectionPanels('decorbox');
                 document.getElementById('box-fill').value = obj.fill || '#ffffff';
                 document.getElementById('rng-box-opacity').value = Math.round((obj.opacity == null ? 1 : obj.opacity) * 100);
                 document.getElementById('val-box-opacity').innerText = Math.round((obj.opacity == null ? 1 : obj.opacity) * 100);
-                document.getElementById('rng-box-radius').value = obj.rx || 0;
-                document.getElementById('val-box-radius').innerText = obj.rx || 0;
-                document.getElementById('box-bar-left').checked = !!obj.customBoxBarLeft;
-                document.getElementById('box-bar-right').checked = !!obj.customBoxBarRight;
-                document.getElementById('box-bar-top').checked = !!obj.customBoxBarTop;
-                document.getElementById('box-bar-bottom').checked = !!obj.customBoxBarBottom;
-                document.getElementById('box-bar-color').value = obj.customBoxBarColor || '#eddc01';
-                document.getElementById('rng-box-barwidth').value = obj.customBoxBarWidth || 8;
-                document.getElementById('val-box-barwidth').innerText = obj.customBoxBarWidth || 8;
+                
+                const isCircle = obj.isDecorCircle;
+                const radiusGroup = document.getElementById('radius-control-group');
+                const barsGroup = document.getElementById('bars-control-group');
+                if (radiusGroup) radiusGroup.classList.toggle('hidden', isCircle);
+                if (barsGroup) barsGroup.classList.toggle('hidden', isCircle);
+
+                if (!isCircle) {
+                    document.getElementById('rng-box-radius').value = obj.rx || 0;
+                    document.getElementById('val-box-radius').innerText = obj.rx || 0;
+                    document.getElementById('box-bar-left').checked = !!obj.customBoxBarLeft;
+                    document.getElementById('box-bar-right').checked = !!obj.customBoxBarRight;
+                    document.getElementById('box-bar-top').checked = !!obj.customBoxBarTop;
+                    document.getElementById('box-bar-bottom').checked = !!obj.customBoxBarBottom;
+                    document.getElementById('box-bar-color').value = obj.customBoxBarColor || '#eddc01';
+                    document.getElementById('rng-box-barwidth').value = obj.customBoxBarWidth || 8;
+                    document.getElementById('val-box-barwidth').innerText = obj.customBoxBarWidth || 8;
+                }
                 return;
             }
 
@@ -999,7 +1033,7 @@
                         sourceHTML: quill.root.innerHTML,
                         globalSettings: { font: gFont, size: gSize.replace('px',''), lh: gLineHeight, align: gAlign, width: gWidth.replace('px','') }
                     });
-                    img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false }); // Blocca distorsione!
+                    img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                     fCanvas.add(img); fCanvas.setActiveObject(img); fCanvas.requestRenderAll(); debouncedSyncPreview();
                 });
             }
@@ -1023,11 +1057,24 @@
             fCanvas.requestRenderAll(); syncUIControls(); syncPreview();
         };
 
+        window.addDecorCircle = function() {
+            const circle = new fabric.Circle({
+                left: fCanvas.getWidth() / 2, top: fCanvas.getHeight() / 2, originX: 'center', originY: 'center',
+                radius: 80, fill: '#ffffff', opacity: 0.92,
+                isDecorCircle: true
+            });
+            circle.set({ objectCaching: false, lockScalingFlip: true, centeredScaling: false });
+            circle.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false, tl: true, tr: true, bl: true, br: true, mtr: true });
+            fCanvas.add(circle); fCanvas.sendBackwards(circle); fCanvas.setActiveObject(circle);
+            fCanvas.requestRenderAll(); syncUIControls(); syncPreview();
+        };
+
         window.updateDecorBoxMetric = function(property, value) {
-            const obj = fCanvas.getActiveObject(); if (!obj || obj.type !== 'rect' || !obj.isDecorBox) return;
+            const obj = fCanvas.getActiveObject(); 
+            if (!obj || (!obj.isDecorBox && !obj.isDecorCircle)) return;
             if (property === 'opacity') { const opacity = Math.max(0, Math.min(100, parseFloat(value) || 0)) / 100; obj.set('opacity', opacity); document.getElementById('val-box-opacity').innerText = Math.round(opacity * 100); }
-            else if (property === 'radius') { const radius = Math.max(0, parseFloat(value) || 0); obj.set({ rx: radius, ry: radius }); document.getElementById('val-box-radius').innerText = radius; }
-            else if (property === 'customBoxBarWidth') { const width = Math.max(1, parseFloat(value) || 1); obj.set(property, width); document.getElementById('val-box-barwidth').innerText = width; }
+            else if (property === 'radius' && obj.isDecorBox) { const radius = Math.max(0, parseFloat(value) || 0); obj.set({ rx: radius, ry: radius }); document.getElementById('val-box-radius').innerText = radius; }
+            else if (property === 'customBoxBarWidth' && obj.isDecorBox) { const width = Math.max(1, parseFloat(value) || 1); obj.set(property, width); document.getElementById('val-box-barwidth').innerText = width; }
             else { obj.set(property, value); }
             obj.dirty = true; obj.setCoords(); fCanvas.requestRenderAll(); debouncedSyncPreview();
         };
@@ -1053,7 +1100,6 @@
                 const box = new fabric.Rect({ left: cx, top: cy, originX: 'center', originY: 'center', width: 340, height: 160, fill: '#ffffff', opacity: 0.96, rx: 16, ry: 16, isDecorBox: true, customBoxBarLeft: true, customBoxBarColor: '#eddc01', customBoxBarWidth: 8 });
                 configureDecorBoxObject(box); fCanvas.add(box); fCanvas.sendToBack(box);
                 
-                // Quote Vettoriali classiche per comodità
                 const openQuote = new fabric.Text('“', { left: cx - 142, top: cy - 48, originX: 'center', originY: 'center', fontSize: 62, fontWeight: 'bold', fill: '#eddc01', fontFamily: 'Montserrat', lockUniScaling: true });
                 const closeQuote = new fabric.Text('”', { left: cx + 142, top: cy + 56, originX: 'center', originY: 'center', fontSize: 62, fontWeight: 'bold', fill: '#eddc01', fontFamily: 'Montserrat', lockUniScaling: true });
                 openQuote.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
@@ -1109,6 +1155,7 @@
                 clone.set({ left: (obj.left || 0) + 24, top: (obj.top || 0) + 24, evented: true });
                 if (clone.type === 'image' && clone.isCustomTextAsset) clone.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
                 else if (clone.type === 'rect' && clone.isDecorBox) configureDecorBoxObject(clone);
+                else if (clone.type === 'circle' && clone.isDecorCircle) { clone.set({ objectCaching: false, lockScalingFlip: true, centeredScaling: false }); clone.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false, tl: true, tr: true, bl: true, br: true, mtr: true }); }
                 else if (clone.type === 'image') configureImageObject(clone);
                 fCanvas.add(clone); fCanvas.setActiveObject(clone); fCanvas.requestRenderAll(); syncUIControls(); syncPreview();
             }, CUSTOM_FABRIC_PROPS);
@@ -1140,7 +1187,6 @@
         window.alignObject = function(mode) { const obj = fCanvas.getActiveObject(); if(obj) { if(mode === 'centerH') fCanvas.viewportCenterObjectH(obj); if(mode === 'centerV') fCanvas.viewportCenterObjectV(obj); obj.setCoords(); fCanvas.requestRenderAll(); syncPreview(); } };
         window.deleteSelectedObject = function() { const obj = fCanvas.getActiveObject(); if (obj) { fCanvas.remove(obj); showSelectionPanels(null); syncPreview(); } };
 
-        // --- EXPORT CAROUSEL E ZIP ---
         async function extractFramesAsBlobs(options = {}) {
             if (fCanvas && currentEditingFrameIndex !== -1) await syncPreview();
             if (document.fonts && document.fonts.ready) await document.fonts.ready;
@@ -1190,7 +1236,6 @@
             });
         }
 
-        // --- LAYER SFUMATURA (Intatto) ---
         (function initGradientLayerFeature() {
             const GRADIENT_LAYER_ID = '__gradient_readability_layer__';
             const DEFAULT_GRADIENT = { enabled: false, direction: 'bottom', size: 45, color: '#000000', opacity: 65 };
@@ -1328,7 +1373,6 @@
             window.deleteSelectedObject = function() { const obj = fCanvas ? fCanvas.getActiveObject() : null; if (obj && obj.isGradientLayer) return; originalDeleteSelectedObject(); syncGradientLayer(false); };
         })();
 
-        // --- PLAYGROUND INSTAGRAM ---
         function openPlayground(btn) {
             withButtonState(btn, "Caricamento...", async () => {
                 const container = document.getElementById('playground-container');
