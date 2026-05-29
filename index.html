@@ -497,10 +497,42 @@
             event.target.value = '';
         }
 
+                function isBlankFrameData(frameData) {
+            return !!(frameData && frameData.isBlankFrame);
+        }
+
+        function getBlankFramesCount() {
+            if (!Array.isArray(state.framesData)) return 0;
+            return state.framesData.filter(isBlankFrameData).length;
+        }
+
+        function getInternalBlankFramesCount() {
+            if (!Array.isArray(state.framesData)) return 0;
+            const before = state.leadingBlankFrames || 0;
+            const after = state.trailingBlankFrames || 0;
+            return state.framesData.filter((frame, index) => {
+                return isBlankFrameData(frame) && index >= before && index < state.framesData.length - after;
+            }).length;
+        }
+
+        function ensureFramesData() {
+            if (!Array.isArray(state.framesData)) state.framesData = [];
+        }
+
         function addBlankFrame(position) {
+            ensureFramesData();
+
             if (position === 'before') {
                 state.leadingBlankFrames = (state.leadingBlankFrames || 0) + 1;
                 state.framesData.unshift({ isBlankFrame: true });
+            } else if (position === 'inside') {
+                const total = state.finalFramesCount || state.framesData.length || 0;
+                const maxAfterFrame = Math.max(1, total - 1);
+                const answer = prompt(`Inserisci il frame vuoto dopo quale frame? Inserisci un numero da 1 a ${maxAfterFrame}.`, String(maxAfterFrame));
+                if (answer === null) return;
+
+                const afterFrameNumber = Math.min(maxAfterFrame, Math.max(1, parseInt(answer, 10) || 1));
+                state.framesData.splice(afterFrameNumber, 0, { isBlankFrame: true });
             } else {
                 state.trailingBlankFrames = (state.trailingBlankFrames || 0) + 1;
                 state.framesData.push({ isBlankFrame: true });
@@ -510,12 +542,14 @@
         }
 
         function removeBlankFrame(position) {
-            if (position === 'before' && state.leadingBlankFrames > 0) {
+            ensureFramesData();
+
+            if (position === 'before' && state.leadingBlankFrames > 0 && isBlankFrameData(state.framesData[0])) {
                 state.leadingBlankFrames--;
                 state.framesData.shift();
             }
 
-            if (position === 'after' && state.trailingBlankFrames > 0) {
+            if (position === 'after' && state.trailingBlankFrames > 0 && isBlankFrameData(state.framesData[state.framesData.length - 1])) {
                 state.trailingBlankFrames--;
                 state.framesData.pop();
             }
@@ -524,13 +558,102 @@
         }
 
         function getFrameInfo(frameIndex) {
-            const before = state.leadingBlankFrames || 0;
+            ensureFramesData();
+
+            if (isBlankFrameData(state.framesData[frameIndex])) return { type: 'blank' };
+
             const imageCount = state.imageFramesCount || Math.max(1, state.maxPossibleFrames - state.excludedFrames);
+            let imageIndex = 0;
 
-            if (frameIndex < before) return { type: 'blank' };
-            if (frameIndex >= before + imageCount) return { type: 'blank' };
+            for (let i = 0; i <= frameIndex; i++) {
+                if (isBlankFrameData(state.framesData[i])) continue;
+                if (i === frameIndex) break;
+                imageIndex++;
+            }
 
-            return { type: 'image', imageIndex: frameIndex - before };
+            if (imageIndex >= imageCount) return { type: 'blank' };
+
+            return { type: 'image', imageIndex };
+        }
+
+        function loadImageFromBlob(blob) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(img);
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error("Impossibile caricare l'immagine esportata."));
+                };
+                img.src = url;
+            });
+        }
+
+        function exportFullEditedImage(btn) {
+            withButtonState(btn, "PNG...", async () => {
+                const blobs = await extractFramesAsBlobs();
+                const targetW = 1080;
+                const targetH = 1350;
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                canvas.width = targetW * blobs.length;
+                canvas.height = targetH;
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                for (let i = 0; i < blobs.length; i++) {
+                    const img = await loadImageFromBlob(blobs[i]);
+                    ctx.drawImage(img, i * targetW, 0, targetW, targetH);
+                }
+
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `${state.projectName}_immagine_intera.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            });
+        }
+
+        function installEditorialExportAndFrameControls() {
+                        const afterBlankButton = Array.from(document.querySelectorAll('button')).find(button => button.getAttribute('onclick') === "addBlankFrame('after')");
+            if (afterBlankButton && !document.getElementById('btn-add-blank-inside')) {
+                const button = document.createElement('button');
+                button.id = 'btn-add-blank-inside';
+                button.className = 'btn-secondary text-[11px] px-1 py-2 col-span-2';
+                button.type = 'button';
+                button.textContent = '+ Vuoto in mezzo';
+                button.onclick = () => addBlankFrame('inside');
+                afterBlankButton.parentElement.appendChild(button);
+            }
+
+            const blankInfo = document.getElementById('blank-after-value');
+            if (blankInfo && !document.getElementById('blank-inside-value')) {
+                blankInfo.parentElement.insertAdjacentHTML('beforeend', ' / <span id="blank-inside-value">0</span> in mezzo');
+            }
+
+            const zipButton = document.querySelector('button[onclick="exportCarousel(this)"]');
+            if (zipButton && !document.getElementById('btn-export-full-edited-image')) {
+                const button = document.createElement('button');
+                button.id = 'btn-export-full-edited-image';
+                button.className = 'btn-secondary w-full text-[11px] px-1 py-3 mt-2';
+                button.type = 'button';
+                button.textContent = 'Immagine intera';
+                button.onclick = function() { exportFullEditedImage(this); };
+                zipButton.parentElement.insertAdjacentElement('afterend', button);
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', installEditorialExportAndFrameControls);
+        } else {
+            installEditorialExportAndFrameControls();
         }
 
         function handleImportJSON(event) {
@@ -604,7 +727,7 @@
             document.getElementById('exclude-value').innerText = state.excludedFrames;
 
                         state.imageFramesCount = state.maxPossibleFrames - state.excludedFrames;
-            state.finalFramesCount = (state.leadingBlankFrames || 0) + state.imageFramesCount + (state.trailingBlankFrames || 0);
+            state.finalFramesCount = state.imageFramesCount + getBlankFramesCount();
             const totalActiveWidth = state.finalFramesCount * state.frameWidth;
 
             if (!state.framesData || state.framesData.length !== state.finalFramesCount) {
@@ -613,6 +736,8 @@
 
             document.getElementById('blank-before-value').innerText = state.leadingBlankFrames || 0;
             document.getElementById('blank-after-value').innerText = state.trailingBlankFrames || 0;
+            const blankInsideValue = document.getElementById('blank-inside-value');
+            if (blankInsideValue) blankInsideValue.innerText = getInternalBlankFramesCount();
 
                         let minX = (state.imageFramesCount * state.frameWidth) - scaledW; if (minX > 0) minX = 0;
             const sliderX = document.getElementById('slider-x'); sliderX.min = minX; sliderX.max = 0;
@@ -1037,7 +1162,8 @@
                 <div id="object-controls" class="hidden flex-col gap-2 border-t border-gray-300 pt-3">
                     <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider bg-gray-200 p-2 border-l-4 border-brand-blue">Elemento selezionato</h4>
                     <div class="grid grid-cols-2 gap-2">
-                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="duplicateSelectedObject()">Duplica</button>
+                                                <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="duplicateSelectedObject()">Duplica</button>
+                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="copySelectedObjectToFrame()">Copia in frame</button>
                         <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerH')">Centra H</button>
                         <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="sendSelectedBackward()">Dietro</button>
                         <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="bringSelectedForward()">Avanti</button>
@@ -1835,7 +1961,7 @@
             input.value = '';
         };
 
-        window.duplicateSelectedObject = function() {
+                window.duplicateSelectedObject = function() {
             const obj = fCanvas.getActiveObject();
             if (!obj) return;
 
@@ -1855,6 +1981,75 @@
                 syncUIControls();
                 syncPreview();
             }, CUSTOM_FABRIC_PROPS);
+        };
+
+        window.copySelectedObjectToFrame = async function() {
+            const obj = fCanvas && fCanvas.getActiveObject();
+            if (!obj) {
+                alert("Seleziona un elemento da copiare.");
+                return;
+            }
+
+            const total = state.finalFramesCount || state.framesData.length || 0;
+            if (total < 2) {
+                alert("Servono almeno due frame.");
+                return;
+            }
+
+            const suggestedFrame = Math.min(total, currentEditingFrameIndex + 2);
+            const answer = prompt(`Copia l'elemento in quale frame? Inserisci un numero da 1 a ${total}.`, String(suggestedFrame));
+            if (answer === null) return;
+
+            const targetIndex = (parseInt(answer, 10) || 0) - 1;
+            if (targetIndex < 0 || targetIndex >= total) {
+                alert("Numero frame non valido.");
+                return;
+            }
+
+            if (targetIndex === currentEditingFrameIndex) {
+                alert("Scegli un frame diverso da quello corrente.");
+                return;
+            }
+
+            if (obj.isEditing) obj.exitEditing();
+            await syncPreview();
+
+            const objectData = obj.toObject(CUSTOM_FABRIC_PROPS);
+            objectData.left = (objectData.left || 0) + 16;
+            objectData.top = (objectData.top || 0) + 16;
+            objectData.evented = true;
+
+            if (!state.framesData[targetIndex]) {
+                state.framesData[targetIndex] = {};
+            }
+
+            let targetJSON = state.framesData[targetIndex].fabricJSON;
+            if (targetJSON) {
+                targetJSON = JSON.parse(JSON.stringify(targetJSON));
+                if (!Array.isArray(targetJSON.objects)) targetJSON.objects = [];
+            } else {
+                targetJSON = {
+                    version: fabric.version,
+                    objects: []
+                };
+            }
+
+            targetJSON.objects.push(objectData);
+            state.framesData[targetIndex].fabricJSON = targetJSON;
+
+            const dataUrl = await renderFabricLayerDataURL(
+                targetJSON,
+                state.frameWidth,
+                state.viewportHeight,
+                2
+            );
+
+            state.framesData[targetIndex].thumbnailBase64 = dataUrl;
+
+            const thumbImg = document.getElementById(`thumb-img-${targetIndex}`);
+            if (thumbImg) thumbImg.src = dataUrl;
+
+            alert(`Elemento copiato nel frame ${targetIndex + 1}.`);
         };
 
         window.bringSelectedForward = function() {
