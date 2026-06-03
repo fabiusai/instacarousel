@@ -936,7 +936,7 @@
 
                             <div class="pt-3 border-t border-gray-200">
                                 <label class="block text-[11px] font-bold text-gray-600 mb-1">Font Family</label>
-                                <select id="font-family" class="w-full border border-gray-300 p-1.5 text-sm bg-white">
+                                                                <select id="font-family" class="w-full border border-gray-300 p-1.5 text-sm bg-white" onchange="scheduleTextAutoApply()">
                                     <option value="Montserrat">Montserrat</option>
                                     <option value="Inter">Inter</option>
                                     <option value="Nunito">Nunito</option>
@@ -949,13 +949,13 @@
                                     <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
                                         <span>Grandezza</span><span id="val-fontsize">24</span>
                                     </label>
-                                    <input type="range" id="rng-fontsize" min="12" max="120" step="1" value="24" oninput="document.getElementById('val-fontsize').innerText = this.value">
+                                    <input type="range" id="rng-fontsize" min="12" max="120" step="1" value="24" oninput="updateTextMetric('val-fontsize', this.value)">
                                 </div>
                                 <div class="flex-1">
                                     <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
                                         <span>Interlinea</span><span id="val-lineheight">1.2</span>
                                     </label>
-                                    <input type="range" id="rng-lineheight" min="0.8" max="2.5" step="0.1" value="1.2" oninput="document.getElementById('val-lineheight').innerText = this.value">
+                                    <input type="range" id="rng-lineheight" min="0.8" max="2.5" step="0.1" value="1.2" oninput="updateTextMetric('val-lineheight', this.value)">
                                 </div>
                             </div>
 
@@ -963,21 +963,22 @@
                                 <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
                                     <span>Larghezza Max (A capo)</span><span id="val-width">600</span>
                                 </label>
-                                <input type="range" id="rng-width" min="100" max="1200" step="10" value="600" oninput="document.getElementById('val-width').innerText = this.value">
+                                <input type="range" id="rng-width" min="100" max="1200" step="10" value="600" oninput="updateTextMetric('val-width', this.value)">
                             </div>
 
                             <div>
                                 <label class="block text-[11px] font-bold text-gray-600 mb-1">Allineamento Paragrafi</label>
                                 <div class="flex gap-1">
-                                    <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="document.getElementById('text-align-hidden').value='left';">← Sx</button>
-                                    <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="document.getElementById('text-align-hidden').value='center';">↔ Ctr</button>
-                                    <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="document.getElementById('text-align-hidden').value='right';">Dx →</button>
+                                    <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="updateTextAlignment('left')">← Sx</button>
+                                    <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="updateTextAlignment('center')">↔ Ctr</button>
+                                    <button class="text-xs border border-gray-300 p-1 flex-1 hover:bg-gray-200 bg-white" onclick="updateTextAlignment('right')">Dx →</button>
                                     <input type="hidden" id="text-align-hidden" value="center">
                                 </div>
                             </div>
                             
                             <div class="pt-3">
-                                <button class="btn-primary w-full bg-brand-yellow text-brand-blue border-brand-yellow hover:bg-yellow-400 font-bold py-3 shadow-md" onclick="applyTextToCanvas()">APPLICA AL CANVAS</button>
+                                <div id="text-auto-status" class="text-[10px] text-gray-500 font-bold uppercase mb-2">Aggiornamento automatico attivo</div>
+                                <button class="btn-primary w-full bg-brand-yellow text-brand-blue border-brand-yellow hover:bg-yellow-400 font-bold py-3 shadow-md" onclick="applyTextToCanvas()">APPLICA ORA</button>
                             </div>
                         </div>
                     </div>
@@ -986,9 +987,40 @@
             sidebar.dataset.accordionReady = 'true';
         }
 
+                let textAutoApplyTimer = null;
+
+        function setTextAutoStatus(message) {
+            const status = document.getElementById('text-auto-status');
+            if (status) status.innerText = message;
+        }
+
+        window.scheduleTextAutoApply = function(delay = 650) {
+            clearTimeout(textAutoApplyTimer);
+            const obj = fCanvas ? fCanvas.getActiveObject() : null;
+            if (!obj || !obj.isCustomTextAsset) return;
+            setTextAutoStatus('Modifiche in preparazione...');
+            textAutoApplyTimer = setTimeout(async () => {
+                setTextAutoStatus('Aggiornamento canvas...');
+                await applyTextToCanvas();
+                setTextAutoStatus('Aggiornato automaticamente');
+            }, delay);
+        };
+
+        window.updateTextMetric = function(labelId, value) {
+            const label = document.getElementById(labelId);
+            if (label) label.innerText = value;
+            scheduleTextAutoApply();
+        };
+
+        window.updateTextAlignment = function(value) {
+            document.getElementById('text-align-hidden').value = value;
+            scheduleTextAutoApply();
+        };
+
         function initQuillIfNeeded() {
             if (!quill && document.getElementById('quill-editor')) {
                 quill = new Quill('#quill-editor', { modules: { toolbar: '#quill-toolbar' }, theme: 'snow' });
+                quill.on('text-change', () => scheduleTextAutoApply());
             }
         }
 
@@ -996,6 +1028,7 @@
             if (!quill) return;
             if (hex === false) quill.format('color', false);
             else quill.format('color', hex);
+            scheduleTextAutoApply(250);
         };
 
         function showSelectionPanels(kind) {
