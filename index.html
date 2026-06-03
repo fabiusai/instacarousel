@@ -987,11 +987,74 @@
             sidebar.dataset.accordionReady = 'true';
         }
 
-                let textAutoApplyTimer = null;
+                        let textAutoApplyTimer = null;
 
         function setTextAutoStatus(message) {
             const status = document.getElementById('text-auto-status');
             if (status) status.innerText = message;
+        }
+
+        function normalizeTextColor(color) {
+            if (!color) return '#111111';
+            const namedColors = { white: '#ffffff', black: '#000000', yellow: '#eddc01', blue: '#0146bc', gray: '#333333', grey: '#333333' };
+            const value = String(color).trim().toLowerCase();
+            if (namedColors[value]) return namedColors[value];
+            if (value.startsWith('#')) {
+                const clean = value.replace('#', '');
+                if (clean.length === 3) return '#' + clean.split('').map(ch => ch + ch).join('');
+                return '#' + clean.padEnd(6, '0').slice(0, 6);
+            }
+            const rgbMatch = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (rgbMatch) {
+                return '#' + [rgbMatch[1], rgbMatch[2], rgbMatch[3]].map(num => {
+                    return Math.max(0, Math.min(255, parseInt(num, 10) || 0)).toString(16).padStart(2, '0');
+                }).join('');
+            }
+            return '#111111';
+        }
+
+        function getColorLuminance(hex) {
+            const clean = normalizeTextColor(hex).replace('#', '');
+            const rgb = [0, 2, 4].map(i => parseInt(clean.slice(i, i + 2), 16) / 255).map(value => {
+                return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+            });
+            return (0.2126 * rgb[0]) + (0.7152 * rgb[1]) + (0.0722 * rgb[2]);
+        }
+
+        function updateQuillEditorBackground() {
+            if (!quill) return;
+            const editor = document.querySelector('#quill-editor .ql-editor');
+            if (!editor) return;
+
+            const ops = quill.getContents().ops || [];
+            let hasLight = false;
+            let hasDark = false;
+
+            ops.forEach(op => {
+                if (typeof op.insert !== 'string' || !op.insert.trim()) return;
+                const color = op.attributes && op.attributes.color ? op.attributes.color : '#111111';
+                if (getColorLuminance(color) >= 0.55) hasLight = true;
+                else hasDark = true;
+            });
+
+            if (hasLight && !hasDark) editor.style.backgroundColor = '#1f2933';
+            else if (hasDark && !hasLight) editor.style.backgroundColor = '#f3f4f6';
+            else editor.style.backgroundColor = '#d1d5db';
+        }
+
+        function applyTextFormatToSelectionOrAll(format, value) {
+            if (!quill) return;
+            const range = quill.getSelection();
+            const length = Math.max(0, quill.getLength() - 1);
+
+            if (range && range.length > 0) {
+                quill.formatText(range.index, range.length, format, value, 'user');
+            } else if (length > 0) {
+                quill.formatText(0, length, format, value, 'user');
+            }
+
+            updateQuillEditorBackground();
+            scheduleTextAutoApply(250);
         }
 
         window.scheduleTextAutoApply = function(delay = 650) {
@@ -1019,16 +1082,32 @@
 
         function initQuillIfNeeded() {
             if (!quill && document.getElementById('quill-editor')) {
-                quill = new Quill('#quill-editor', { modules: { toolbar: '#quill-toolbar' }, theme: 'snow' });
-                quill.on('text-change', () => scheduleTextAutoApply());
+                quill = new Quill('#quill-editor', {
+                    modules: {
+                        toolbar: {
+                            container: '#quill-toolbar',
+                            handlers: {
+                                bold: value => applyTextFormatToSelectionOrAll('bold', value),
+                                italic: value => applyTextFormatToSelectionOrAll('italic', value),
+                                underline: value => applyTextFormatToSelectionOrAll('underline', value),
+                                strike: value => applyTextFormatToSelectionOrAll('strike', value)
+                            }
+                        }
+                    },
+                    theme: 'snow'
+                });
+                quill.on('text-change', () => {
+                    updateQuillEditorBackground();
+                    scheduleTextAutoApply();
+                });
+                quill.on('selection-change', updateQuillEditorBackground);
+                updateQuillEditorBackground();
             }
         }
 
         window.applyQuickColor = function(hex) {
             if (!quill) return;
-            if (hex === false) quill.format('color', false);
-            else quill.format('color', hex);
-            scheduleTextAutoApply(250);
+            applyTextFormatToSelectionOrAll('color', hex === false ? false : hex);
         };
 
         function showSelectionPanels(kind) {
