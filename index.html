@@ -1282,7 +1282,26 @@
         window.bringSelectedForward = function() { const obj = fCanvas.getActiveObject(); if (!obj) return; fCanvas.bringForward(obj); fCanvas.requestRenderAll(); syncPreview(); };
         window.sendSelectedBackward = function() { const obj = fCanvas.getActiveObject(); if (!obj) return; fCanvas.sendBackwards(obj); fCanvas.requestRenderAll(); syncPreview(); };
         window.alignObject = function(mode) { const obj = fCanvas.getActiveObject(); if(obj) { if(mode === 'centerH') fCanvas.viewportCenterObjectH(obj); if(mode === 'centerV') fCanvas.viewportCenterObjectV(obj); obj.setCoords(); fCanvas.requestRenderAll(); syncPreview(); } };
-        window.deleteSelectedObject = function() { const obj = fCanvas.getActiveObject(); if (obj) { fCanvas.remove(obj); showSelectionPanels(null); syncPreview(); } };
+                window.deleteSelectedObject = function() {
+            const obj = fCanvas ? fCanvas.getActiveObject() : null;
+            if (!obj) return;
+            if (!window.confirm('Sei sicuro di voler cancellare questo oggetto?')) return;
+            fCanvas.remove(obj);
+            showSelectionPanels(null);
+            syncPreview();
+        };
+
+        document.addEventListener('keydown', event => {
+            const tagName = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
+            const isEditableField = tagName === 'input' || tagName === 'textarea' || tagName === 'select' || (event.target && event.target.isContentEditable);
+            if (isEditableField || event.metaKey || event.ctrlKey || event.altKey) return;
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+                const obj = fCanvas ? fCanvas.getActiveObject() : null;
+                if (!obj) return;
+                event.preventDefault();
+                window.deleteSelectedObject();
+            }
+        });
 
         async function extractFramesAsBlobs(options = {}) {
             if (fCanvas && currentEditingFrameIndex !== -1) await syncPreview();
@@ -1359,9 +1378,10 @@
 
             function findGradientLayer(canvas) { if (!canvas) return null; return canvas.getObjects().find(obj => obj.isGradientLayer || obj.gradientLayerId === GRADIENT_LAYER_ID) || null; }
 
-            function buildGradientFill(settings, w, h) {
+                        function buildGradientFill(settings, w, h) {
                 const alpha = Math.max(0, Math.min(100, parseFloat(settings.opacity) || 0)) / 100;
                 const solid = rgba(settings.color, alpha); const clear = rgba(settings.color, 0);
+                if (settings.direction === 'full') return solid;
                 if (settings.direction === 'top') return new fabric.Gradient({ type: 'linear', coords: { x1: 0, y1: 0, x2: 0, y2: h }, colorStops: [ { offset: 0, color: solid }, { offset: 1, color: clear } ] });
                 if (settings.direction === 'bottom') return new fabric.Gradient({ type: 'linear', coords: { x1: 0, y1: 0, x2: 0, y2: h }, colorStops: [ { offset: 0, color: clear }, { offset: 1, color: solid } ] });
                 if (settings.direction === 'left') return new fabric.Gradient({ type: 'linear', coords: { x1: 0, y1: 0, x2: w, y2: 0 }, colorStops: [ { offset: 0, color: solid }, { offset: 1, color: clear } ] });
@@ -1371,6 +1391,7 @@
             function getGradientGeometry(settings) {
                 const canvasW = fCanvas ? fCanvas.getWidth() : state.frameWidth; const canvasH = fCanvas ? fCanvas.getHeight() : state.viewportHeight;
                 const sizePercent = Math.max(1, Math.min(100, parseFloat(settings.size) || DEFAULT_GRADIENT.size));
+                if (settings.direction === 'full') return { left: 0, top: 0, width: canvasW, height: canvasH };
                 if (settings.direction === 'top' || settings.direction === 'bottom') { const h = canvasH * (sizePercent / 100); return { left: 0, top: settings.direction === 'bottom' ? canvasH - h : 0, width: canvasW, height: h }; }
                 const w = canvasW * (sizePercent / 100); return { left: settings.direction === 'right' ? canvasW - w : 0, top: 0, width: w, height: canvasH };
             }
@@ -1413,7 +1434,7 @@
                         <div>
                             <label class="block text-[11px] font-bold text-gray-600 mb-1">Direzione</label>
                             <select id="gradient-direction" class="w-full border border-gray-300 p-1.5 text-xs bg-white" onchange="updateGradientSetting('direction', this.value)">
-                                <option value="top">Dall'alto</option> <option value="bottom">Dal basso</option> <option value="left">Da sinistra</option> <option value="right">Da destra</option>
+                                <option value="top">Dall'alto</option> <option value="bottom">Dal basso</option> <option value="left">Da sinistra</option> <option value="right">Da destra</option> <option value="full">Intera slide</option>
                             </select>
                         </div>
                         <div>
