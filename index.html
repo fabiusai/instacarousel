@@ -60,7 +60,7 @@
         .ql-editor { padding: 8px !important; min-height: 80px; }
 
         #render-stage { position: absolute; left: -9999px; top: -9999px; z-index: -1; pointer-events: none; }
-        #render-text-container { display: inline-block; padding: 4px; white-space: pre-wrap; word-wrap: break-word; }
+                #render-text-container { display: inline-block; padding: 4px; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
         #render-text-content p { margin: 0 !important; padding: 0 !important; line-height: inherit; }
     </style>
 </head>
@@ -740,7 +740,10 @@
             fCanvas.on('selection:created', syncUIControls);
             fCanvas.on('selection:updated', syncUIControls);
             fCanvas.on('selection:cleared', () => { showSelectionPanels(null); });
-            fCanvas.on('object:modified', debouncedSyncPreview);
+                                    fCanvas.on('object:modified', function(e) {
+                if (applyTextWidthFromCanvasResize(e)) return;
+                debouncedSyncPreview();
+            });
             fCanvas.on('object:moving', function(e) {
                 const obj = e.target; const center = fCanvas.getCenter(); const snapT = 15;
                 document.getElementById('guide-v').classList.add('hidden'); document.getElementById('guide-h').classList.add('hidden');
@@ -949,7 +952,7 @@
                                     <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
                                         <span>Grandezza</span><span id="val-fontsize">24</span>
                                     </label>
-                                    <input type="range" id="rng-fontsize" min="12" max="120" step="1" value="24" oninput="updateTextMetric('val-fontsize', this.value)">
+                                    <input type="range" id="rng-fontsize" min="10" max="84" step="1" value="24" oninput="updateTextMetric('val-fontsize', this.value)">
                                 </div>
                                 <div class="flex-1">
                                     <label class="flex justify-between text-[11px] font-bold text-gray-600 mb-1">
@@ -1125,8 +1128,9 @@
             const obj = fCanvas.getActiveObject();
             if (!obj) { showSelectionPanels(null); return; }
 
-            if (obj.isCustomTextAsset) {
+                        if (obj.isCustomTextAsset) {
                 showSelectionPanels('textbox');
+                configureTextObject(obj);
                 initQuillIfNeeded();
                 quill.root.innerHTML = obj.sourceHTML || '';
                 if (obj.globalSettings) {
@@ -1198,53 +1202,172 @@
             return trimmed;
         }
 
-        window.applyTextToCanvas = async function(isNew = false) {
+                                const TEXT_RENDER_SCALE = 3;
+        const TEXT_OBJECT_SCALE = 1 / TEXT_RENDER_SCALE;
+        const TEXT_MIN_FONT_SIZE = 10;
+        const TEXT_MAX_FONT_SIZE = 84;
+        let textApplyRevision = 0;
+
+        function clampTextWidth(value) {
+            const canvasWidth = fCanvas ? fCanvas.getWidth() : state.frameWidth;
+            return Math.max(100, Math.min(canvasWidth - 32, Math.round(parseFloat(value) || 600)));
+        }
+
+        function clampFontSize(value) {
+            return Math.max(TEXT_MIN_FONT_SIZE, Math.min(TEXT_MAX_FONT_SIZE, Math.round(parseFloat(value) || 24)));
+        }
+
+        function syncTextWidthControls(value) {
+            const safeWidth = clampTextWidth(value);
+            const input = document.getElementById('rng-width');
+            const label = document.getElementById('val-width');
+            if (input) input.value = safeWidth;
+            if (label) label.innerText = safeWidth;
+            return safeWidth;
+        }
+
+        function syncTextFontControls(value) {
+            const safeSize = clampFontSize(value);
+            const input = document.getElementById('rng-fontsize');
+            const label = document.getElementById('val-fontsize');
+            if (input) input.value = safeSize;
+            if (label) label.innerText = safeSize;
+            return safeSize;
+        }
+
+        function configureTextObject(obj) {
+            if (!obj || !obj.isCustomTextAsset) return;
+            obj.set({ lockUniScaling: false, lockScalingFlip: true, centeredScaling: false, objectCaching: false });
+            obj.setControlsVisibility({ mt: true, mb: true, ml: true, mr: true, tl: true, tr: true, bl: true, br: true, mtr: true });
+            obj.setCoords();
+        }
+
+        function getTextRenderSettings(widthOverride, sizeOverride) {
+            const width = syncTextWidthControls(widthOverride || document.getElementById('rng-width').value);
+            const fontSize = syncTextFontControls(sizeOverride || document.getElementById('rng-fontsize').value);
+            return {
+                font: document.getElementById('font-family').value,
+                size: fontSize + 'px',
+                fontSize,
+                lineHeight: document.getElementById('rng-lineheight').value,
+                align: document.getElementById('text-align-hidden').value || 'center',
+                width
+            };
+        }
+
+        async function renderTextCanvas(htmlContent, settings) {
+            const container = document.getElementById('render-text-container');
+            const content = document.getElementById('render-text-content');
+            
+            content.innerHTML = htmlContent;
+            container.style.fontFamily = settings.font;
+            container.style.fontSize = settings.fontSize + 'px';
+            container.style.lineHeight = settings.lineHeight;
+            container.style.textAlign = settings.align;
+            container.style.maxWidth = settings.width + 'px';
+
+            await new Promise(r => requestAnimationFrame(r));
+            return trimCanvas(await html2canvas(container, { backgroundColor: null, scale: TEXT_RENDER_SCALE, logging: false }));
+        }
+
+        async function renderTextWithoutOverflow(htmlContent, settings) {
+            let canvas = await renderTextCanvas(htmlContent, settings);
+            const maxDisplayWidth = Math.max(100, (fCanvas ? fCanvas.getWidth() : state.frameWidth) - 32);
+            const displayWidth = canvas.width * TEXT_OBJECT_SCALE;
+
+            if (displayWidth > maxDisplayWidth) {
+                settings.width = syncTextWidthControls(settings.width * (maxDisplayWidth / displayWidth));
+                canvas = await renderTextCanvas(htmlContent, settings);
+            }
+
+            return canvas;
+        }
+
+        async function fitTextToBox(htmlContent, settings, targetWidth, targetHeight) {
+            settings.width = syncTextWidthControls(targetWidth || settings.width);
+            const maxWidth = Math.max(100, targetWidth || ((fCanvas ? fCanvas.getWidth() : state.frameWidth) - 32));
+            const maxHeight = Math.max(24, targetHeight || ((fCanvas ? fCanvas.getHeight() : state.viewportHeight) - 32));
+
+            let canvas = await renderTextCanvas(htmlContent, settings);
+            let displayWidth = canvas.width * TEXT_OBJECT_SCALE;
+            let displayHeight = canvas.height * TEXT_OBJECT_SCALE;
+
+            if (displayWidth <= maxWidth && displayHeight <= maxHeight) return canvas;
+
+            const widthRatio = maxWidth / Math.max(1, displayWidth);
+            const heightRatio = maxHeight / Math.max(1, displayHeight);
+            settings.fontSize = syncTextFontControls(settings.fontSize * Math.min(widthRatio, heightRatio, 1));
+            settings.size = settings.fontSize + 'px';
+
+            return renderTextCanvas(htmlContent, settings);
+        }
+
+        function loadFabricImage(dataUrl) {
+            return new Promise(resolve => fabric.Image.fromURL(dataUrl, resolve));
+        }
+
+        window.applyTextWidthFromCanvasResize = function(eventOrObject) {
+            const obj = eventOrObject && eventOrObject.target ? eventOrObject.target : eventOrObject;
+            if (!obj || !obj.isCustomTextAsset) return false;
+
+            const action = eventOrObject && eventOrObject.transform ? eventOrObject.transform.action : '';
+            const wasResized = action && action !== 'drag' && (Math.abs(obj.scaleX - TEXT_OBJECT_SCALE) > 0.015 || Math.abs(obj.scaleY - TEXT_OBJECT_SCALE) > 0.015);
+            if (!wasResized) return false;
+
+            const targetWidth = Math.max(100, obj.width * obj.scaleX);
+            const targetHeight = Math.max(24, obj.height * obj.scaleY);
+            const center = obj.getCenterPoint();
+
+            obj.set({ left: center.x, top: center.y, originX: 'center', originY: 'center', scaleX: TEXT_OBJECT_SCALE, scaleY: TEXT_OBJECT_SCALE });
+            obj.setCoords();
+
+            applyTextToCanvas(false, { targetWidth, targetHeight, center, fitToBox: true });
+            return true;
+        };
+
+        window.applyTextToCanvas = async function(isNew = false, fitBox = null) {
+            const applyRevision = ++textApplyRevision;
             const activeObj = fCanvas.getActiveObject();
             if (!isNew && (!activeObj || !activeObj.isCustomTextAsset)) return;
 
             let htmlContent = quill.root.innerHTML;
             htmlContent = htmlContent.replace(/<p><br><\/p>$/i, '').replace(/<br>$/i, '');
 
-            const gFont = document.getElementById('font-family').value;
-            const gSize = document.getElementById('rng-fontsize').value + 'px';
-            const gLineHeight = document.getElementById('rng-lineheight').value;
-            const gAlign = document.getElementById('text-align-hidden').value || 'center';
-            const gWidth = document.getElementById('rng-width').value + 'px';
+            const settings = getTextRenderSettings(fitBox && fitBox.targetWidth ? fitBox.targetWidth : null);
+            const trimmedCanvas = fitBox && fitBox.fitToBox
+                ? await fitTextToBox(htmlContent, settings, fitBox.targetWidth, fitBox.targetHeight)
+                : await renderTextWithoutOverflow(htmlContent, settings);
 
-            const container = document.getElementById('render-text-container');
-            const content = document.getElementById('render-text-content');
-            
-            content.innerHTML = htmlContent;
-            container.style.fontFamily = gFont; container.style.fontSize = gSize;
-            container.style.lineHeight = gLineHeight; container.style.textAlign = gAlign;
-            container.style.maxWidth = gWidth;
+            if (applyRevision !== textApplyRevision) return;
 
-            await new Promise(r => requestAnimationFrame(r));
-            const canvas = await html2canvas(container, { backgroundColor: null, scale: 3, logging: false });
-            const trimmedCanvas = trimCanvas(canvas);
+            const img = await loadFabricImage(trimmedCanvas.toDataURL('image/png'));
+            if (applyRevision !== textApplyRevision) return;
 
             if (!isNew && activeObj && activeObj.isCustomTextAsset) {
-                const oldLeft = activeObj.left; const oldTop = activeObj.top;
-                fabric.Image.fromURL(trimmedCanvas.toDataURL('image/png'), function(img) {
-                    activeObj.setElement(img.getElement());
-                    activeObj.set({
-                        width: img.width, height: img.height, left: oldLeft, top: oldTop,
-                        sourceHTML: quill.root.innerHTML,
-                        globalSettings: { font: gFont, size: gSize.replace('px',''), lh: gLineHeight, align: gAlign, width: gWidth.replace('px','') }
-                    });
-                    activeObj.setCoords(); fCanvas.requestRenderAll(); debouncedSyncPreview();
+                const center = fitBox && fitBox.center ? fitBox.center : activeObj.getCenterPoint();
+                activeObj.setElement(img.getElement());
+                activeObj.set({
+                    width: img.width, height: img.height, left: center.x, top: center.y, originX: 'center', originY: 'center',
+                    scaleX: TEXT_OBJECT_SCALE, scaleY: TEXT_OBJECT_SCALE,
+                    sourceHTML: quill.root.innerHTML,
+                    globalSettings: { font: settings.font, size: settings.fontSize, lh: settings.lineHeight, align: settings.align, width: settings.width }
                 });
+                configureTextObject(activeObj);
+                fCanvas.setActiveObject(activeObj);
+                fCanvas.requestRenderAll();
+                debouncedSyncPreview();
             } else {
-                fabric.Image.fromURL(trimmedCanvas.toDataURL('image/png'), function(img) {
-                    img.set({
-                        left: fCanvas.width / 2, top: fCanvas.height / 2, originX: 'center', originY: 'center',
-                        scaleX: 1/3, scaleY: 1/3, lockUniScaling: true, isCustomTextAsset: true,
-                        sourceHTML: quill.root.innerHTML,
-                        globalSettings: { font: gFont, size: gSize.replace('px',''), lh: gLineHeight, align: gAlign, width: gWidth.replace('px','') }
-                    });
-                    img.setControlsVisibility({ mt: false, mb: false, ml: false, mr: false });
-                    fCanvas.add(img); fCanvas.setActiveObject(img); fCanvas.requestRenderAll(); debouncedSyncPreview();
+                img.set({
+                    left: fCanvas.width / 2, top: fCanvas.height / 2, originX: 'center', originY: 'center',
+                    scaleX: TEXT_OBJECT_SCALE, scaleY: TEXT_OBJECT_SCALE, isCustomTextAsset: true,
+                    sourceHTML: quill.root.innerHTML,
+                    globalSettings: { font: settings.font, size: settings.fontSize, lh: settings.lineHeight, align: settings.align, width: settings.width }
                 });
+                configureTextObject(img);
+                fCanvas.add(img);
+                fCanvas.setActiveObject(img);
+                fCanvas.requestRenderAll();
+                debouncedSyncPreview();
             }
         };
 
