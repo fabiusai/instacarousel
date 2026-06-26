@@ -1690,9 +1690,10 @@
             function getGradientGeometry(settings) {
                 const canvasW = fCanvas ? fCanvas.getWidth() : state.frameWidth; const canvasH = fCanvas ? fCanvas.getHeight() : state.viewportHeight;
                 const sizePercent = Math.max(1, Math.min(100, parseFloat(settings.size) || DEFAULT_GRADIENT.size));
-                if (settings.direction === 'full') return { left: 0, top: 0, width: canvasW, height: canvasH };
-                if (settings.direction === 'top' || settings.direction === 'bottom') { const h = canvasH * (sizePercent / 100); return { left: 0, top: settings.direction === 'bottom' ? canvasH - h : 0, width: canvasW, height: h }; }
-                const w = canvasW * (sizePercent / 100); return { left: settings.direction === 'right' ? canvasW - w : 0, top: 0, width: w, height: canvasH };
+                const b = 4; // Margine di "abbondanza" (bleed) per eliminare la riga di giunzione
+                if (settings.direction === 'full') return { left: -b, top: -b, width: canvasW + (b*2), height: canvasH + (b*2) };
+                if (settings.direction === 'top' || settings.direction === 'bottom') { const h = canvasH * (sizePercent / 100); return { left: -b, top: settings.direction === 'bottom' ? canvasH - h : -b, width: canvasW + (b*2), height: h + b }; }
+                const w = canvasW * (sizePercent / 100); return { left: settings.direction === 'right' ? canvasW - w : -b, top: -b, width: w + b, height: canvasH + (b*2) };
             }
 
             function configureGradientLayer(layer, settings) {
