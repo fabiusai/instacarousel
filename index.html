@@ -656,8 +656,8 @@
             if (!state.imgObj) return;
             state.scale = parseFloat(document.getElementById('slider-scale').value);
             const scaledW = state.imgObj.naturalWidth * state.scale; const scaledH = state.imgObj.naturalHeight * state.scale;
-            let maxFrames = Math.floor(scaledW / state.frameWidth);
-            if (maxFrames < 1) maxFrames = 1; if (maxFrames > 10) maxFrames = 10;
+            let maxFrames = Math.ceil(scaledW / state.frameWidth);
+            if (maxFrames < 1) maxFrames = 1;
             state.maxPossibleFrames = maxFrames;
 
             const excludeSlider = document.getElementById('slider-exclude');
