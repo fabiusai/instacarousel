@@ -518,7 +518,7 @@
             const action = [el.getAttribute('onclick') || '', el.getAttribute('oninput') || '', el.getAttribute('onchange') || ''].join(' ');
             if (/exportCarousel|exportProjectJSON|exportFullEditedImage|openPlayground|closePlayground|closeAdvancedEditor|closeWithoutSaving|changeEditorZoom|fitZoomToSlide|fitZoomToAll/.test(action)) return false;
             
-            return /addBlankFrame|removeBlankFrame|handleReplaceMainImage|addPreset|addDecorBox|addDecorCircle|handleOverlayImageImport|duplicateSelectedObject|copySelectedObjectToNextSlide|bringSelectedForward|sendSelectedBackward|alignObject|deleteSelectedObject|applyTextToCanvas|applyQuickColor|toggleSlideGradient|selectAllGradientSlides|updateSelectiveGradient/.test(action) || el.id === 'fabric-canvas' || el.isContentEditable;
+            return /addBlankFrame|removeBlankFrame|handleReplaceMainImage|addPreset|addDecorBox|addDecorCircle|handleOverlayImageImport|duplicateSelectedObject|copySelectedObjectToNextSlide|bringSelectedForward|sendSelectedBackward|alignObject|alignMultiple|deleteSelectedObject|applyTextToCanvas|applyQuickColor|toggleSlideGradient|selectAllGradientSlides|updateSelectiveGradient/.test(action) || el.id === 'fabric-canvas' || el.isContentEditable;
         }
 
         document.addEventListener('pointerdown', event => { if (shouldTrackUndoTarget(event.target)) saveUndoSnapshot(); }, true);
@@ -1312,16 +1312,26 @@
                 </div>
 
                 <div id="object-controls" class="hidden flex-col gap-2 border-t border-gray-300 pt-3">
-                    <h4 class="font-bold text-gray-800 text-xs uppercase tracking-wider bg-gray-200 p-2 border-l-4 border-brand-blue">Azione su Elemento</h4>
+                    <h4 id="obj-ctrl-title" class="font-bold text-gray-800 text-xs uppercase tracking-wider bg-gray-200 p-2 border-l-4 border-brand-blue">Azione su Elemento</h4>
+                    
+                    <div id="multi-align-panel" class="hidden flex-col gap-1 mb-1">
+                        <label class="text-[10px] font-bold text-gray-600 uppercase">Allineamento Reciproco (Multiplo)</label>
+                        <div class="flex gap-1">
+                            <button class="text-xs border border-gray-300 p-1.5 flex-1 hover:bg-gray-100 font-bold" title="Allinea a Sinistra" onclick="alignMultiple('left')">⇤ Sx</button>
+                            <button class="text-xs border border-gray-300 p-1.5 flex-1 hover:bg-gray-100 font-bold" title="Allinea al Centro" onclick="alignMultiple('center')">⇹ Ctr</button>
+                            <button class="text-xs border border-gray-300 p-1.5 flex-1 hover:bg-gray-100 font-bold" title="Allinea a Destra" onclick="alignMultiple('right')">Dx ⇥</button>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-2">
                         <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="duplicateSelectedObject()">Duplica</button>
-                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="copySelectedObjectToNextSlide()">Copia in avanti</button>
-                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerH')">Centra Orizz.</button>
-                        <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerV')">Centra Vert.</button>
+                        <button id="btn-copy-next" class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="copySelectedObjectToNextSlide()">Copia in avanti</button>
+                        <button id="btn-center-h" class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerH')">Centra Orizz.</button>
+                        <button id="btn-center-v" class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="alignObject('centerV')">Centra Vert.</button>
                         <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="sendSelectedBackward()">Porta Giù</button>
                         <button class="text-[10px] uppercase font-bold border border-gray-300 bg-white py-1.5 hover:bg-gray-100" onclick="bringSelectedForward()">Porta Su</button>
                     </div>
-                    <button class="text-red-600 text-[11px] font-bold uppercase py-1 hover:bg-red-50 border border-red-200" onclick="deleteSelectedObject()">Elimina Elemento</button>
+                    <button class="text-red-600 text-[11px] font-bold uppercase py-1 hover:bg-red-50 border border-red-200" onclick="deleteSelectedObject()">Elimina Selezionati</button>
                 </div>
 
                 <div id="box-controls" class="hidden flex-col gap-3 border-t border-gray-300 pt-3">
@@ -1433,6 +1443,28 @@
             const obj = fCanvas.getActiveObject();
             if (!obj || obj.isGradientLayer) return showSelectionPanels(null);
             
+            // Gestione Dinamica UI in caso di Gruppi (Multi-selezione)
+            const isMulti = obj.type === 'activeSelection';
+            const multiAlignPanel = document.getElementById('multi-align-panel');
+            const title = document.getElementById('obj-ctrl-title');
+            const btnCopyNext = document.getElementById('btn-copy-next');
+            const btnCenterH = document.getElementById('btn-center-h');
+            const btnCenterV = document.getElementById('btn-center-v');
+
+            if (isMulti) {
+                if (multiAlignPanel) { multiAlignPanel.classList.remove('hidden'); multiAlignPanel.classList.add('flex'); }
+                if (title) title.innerText = `GRUPPO ELEMENTI (${obj._objects.length})`;
+                if (btnCenterH) btnCenterH.classList.add('opacity-50', 'pointer-events-none');
+                if (btnCenterV) btnCenterV.classList.add('opacity-50', 'pointer-events-none');
+                if (btnCopyNext) btnCopyNext.classList.add('opacity-50', 'pointer-events-none');
+            } else {
+                if (multiAlignPanel) { multiAlignPanel.classList.add('hidden'); multiAlignPanel.classList.remove('flex'); }
+                if (title) title.innerText = 'Azione su Elemento';
+                if (btnCenterH) btnCenterH.classList.remove('opacity-50', 'pointer-events-none');
+                if (btnCenterV) btnCenterV.classList.remove('opacity-50', 'pointer-events-none');
+                if (btnCopyNext) btnCopyNext.classList.remove('opacity-50', 'pointer-events-none');
+            }
+
             if (obj.isCustomTextAsset) {
                 showSelectionPanels('text'); 
                 obj.set({ lockUniScaling: false, lockScalingFlip: true, objectCaching: false }); 
@@ -1475,9 +1507,40 @@
             }
         }
 
+        window.alignMultiple = function(mode) {
+            const sel = fCanvas ? fCanvas.getActiveObject() : null;
+            if (!sel || sel.type !== 'activeSelection') return;
+
+            const selLeft = sel.left;
+            const selWidth = sel.width;
+            const selRight = selLeft + selWidth;
+            const selCenter = selLeft + selWidth / 2;
+
+            const targets = fCanvas.getActiveObjects();
+            fCanvas.discardActiveObject(); 
+
+            targets.forEach(obj => {
+                const objW = obj.width * obj.scaleX;
+                if (mode === 'left') {
+                    obj.set('left', selLeft + objW / 2);
+                } else if (mode === 'center') {
+                    obj.set('left', selCenter);
+                } else if (mode === 'right') {
+                    obj.set('left', selRight - objW / 2);
+                }
+                obj.setCoords();
+            });
+
+            // Reseleziona il nuovo gruppo aggiornato
+            const newSel = new fabric.ActiveSelection(targets, { canvas: fCanvas });
+            fCanvas.setActiveObject(newSel);
+            fCanvas.requestRenderAll();
+            debouncedSyncPreview();
+        };
+
         window.alignObject = function(mode) { 
             const obj = fCanvas ? fCanvas.getActiveObject() : null; 
-            if (!obj) return; 
+            if (!obj || obj.type === 'activeSelection') return; 
             if (mode === 'centerH') { 
                 const idx = Math.floor(obj.left / state.frameWidth); 
                 obj.set('left', (idx * state.frameWidth) + (state.frameWidth / 2)); 
@@ -1491,7 +1554,7 @@
 
         window.copySelectedObjectToNextSlide = function() { 
             const obj = fCanvas && fCanvas.getActiveObject(); 
-            if (!obj) return; 
+            if (!obj || obj.type === 'activeSelection') return; 
             const idx = Math.floor(obj.left / state.frameWidth); 
             if (idx + 1 >= state.finalFramesCount) return; 
             
@@ -1507,6 +1570,24 @@
         window.duplicateSelectedObject = function() { 
             const obj = fCanvas.getActiveObject(); 
             if (!obj) return; 
+            
+            // Supporto duplicazione interi gruppi (ActiveSelection)
+            if (obj.type === 'activeSelection') {
+                obj.clone(cloned => {
+                    fCanvas.discardActiveObject();
+                    cloned.canvas = fCanvas;
+                    cloned.forEachObject(c => {
+                        c.set({ left: c.left + 24, top: c.top + 24, evented: true });
+                        fCanvas.add(c);
+                    });
+                    cloned.setCoords();
+                    fCanvas.setActiveObject(cloned);
+                    fCanvas.requestRenderAll();
+                    debouncedSyncPreview();
+                }, CUSTOM_FABRIC_PROPS);
+                return;
+            }
+
             obj.clone(c => { 
                 c.set({ left: (obj.left || 0) + 24, top: (obj.top || 0) + 24, evented: true }); 
                 fCanvas.add(c); 
@@ -1518,10 +1599,18 @@
 
         window.bringSelectedForward = function() { const obj = fCanvas.getActiveObject(); if (obj) { fCanvas.bringForward(obj); fCanvas.requestRenderAll(); debouncedSyncPreview(); } };
         window.sendSelectedBackward = function() { const obj = fCanvas.getActiveObject(); if (obj) { fCanvas.sendBackwards(obj); fCanvas.requestRenderAll(); debouncedSyncPreview(); } };
+        
         window.deleteSelectedObject = function() { 
             const obj = fCanvas ? fCanvas.getActiveObject() : null; 
-            if (obj && !obj.isGradientLayer && confirm('Cancellare elemento?')) { 
-                fCanvas.remove(obj); 
+            if (!obj || obj.isGradientLayer) return; 
+            if (confirm('Cancellare gli elementi selezionati?')) { 
+                // Permette di eliminare massivamente i gruppi
+                if (obj.type === 'activeSelection') {
+                    obj.forEachObject(o => fCanvas.remove(o));
+                    fCanvas.discardActiveObject();
+                } else {
+                    fCanvas.remove(obj); 
+                }
                 showSelectionPanels(null); 
                 debouncedSyncPreview(); 
             } 
