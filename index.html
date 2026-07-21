@@ -1360,27 +1360,49 @@
                             </div>
                             <div id="quill-editor" class="w-full border border-gray-300 bg-gray-200 outline-none"></div>
                             
+                            <label class="block text-[11px] font-bold text-gray-600 mt-2 -mb-1">Colore Parole Selezionate</label>
                             <div class="flex gap-1.5 mt-1">
-                                <button class="w-5 h-5 rounded-full bg-[#111111]" onclick="applyQuickColor('#111111')"></button>
-                                <button class="w-5 h-5 rounded-full bg-[#ffffff]" onclick="applyQuickColor('#ffffff')"></button>
-                                <button class="w-5 h-5 rounded-full bg-[#eddc01]" onclick="applyQuickColor('#eddc01')"></button>
+                                <button class="w-5 h-5 rounded-full bg-[#111111] border border-gray-300 shadow-sm" onclick="applyQuickColor('#111111')"></button>
+                                <button class="w-5 h-5 rounded-full bg-[#333333] border border-gray-300 shadow-sm" onclick="applyQuickColor('#333333')"></button>
+                                <button class="w-5 h-5 rounded-full bg-[#0146bc] border border-gray-300 shadow-sm" onclick="applyQuickColor('#0146bc')"></button>
+                                <button class="w-5 h-5 rounded-full bg-[#eddc01] border border-gray-300 shadow-sm" onclick="applyQuickColor('#eddc01')"></button>
+                                <button class="w-5 h-5 rounded-full bg-[#ffffff] border border-gray-300 shadow-sm" onclick="applyQuickColor('#ffffff')"></button>
+                                <button class="w-5 h-5 rounded-full bg-transparent border border-red-500 flex items-center justify-center text-red-500 text-[10px] font-bold" title="Rimuovi colore" onclick="applyQuickColor(false)">X</button>
                             </div>
-                            <select id="font-family" class="w-full border border-gray-300 p-1 text-sm" onchange="scheduleTextAutoApply()">
+                            
+                            <label class="block text-[11px] font-bold text-gray-600 mt-2 -mb-1">Font Family</label>
+                            <select id="font-family" class="w-full border border-gray-300 p-1.5 text-sm" onchange="scheduleTextAutoApply()">
                                 <option value="Montserrat">Montserrat</option>
                                 <option value="Inter">Inter</option>
                                 <option value="Nunito">Nunito</option>
                             </select>
-                            <div class="flex gap-2">
-                                <input type="range" id="rng-fontsize" min="10" max="84" step="1" value="24" oninput="updateTextMetric('val-fontsize', this.value)">
-                                <input type="range" id="rng-lineheight" min="0.8" max="2.5" step="0.1" value="1.2" oninput="updateTextMetric('val-lineheight', this.value)">
+                            
+                            <div class="grid grid-cols-2 gap-3 mt-1">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-gray-600 mb-1">Grandezza (px)</label>
+                                    <input type="number" id="rng-fontsize" min="10" max="300" step="1" value="24" class="w-full border border-gray-300 p-1.5 text-sm outline-none font-mono" oninput="scheduleTextAutoApply()">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-gray-600 mb-1">Interlinea</label>
+                                    <input type="number" id="rng-lineheight" min="0.5" max="3" step="0.1" value="1.2" class="w-full border border-gray-300 p-1.5 text-sm outline-none font-mono" oninput="scheduleTextAutoApply()">
+                                </div>
                             </div>
-                            <input type="range" id="rng-width" min="100" max="1200" step="10" value="600" oninput="updateTextMetric('val-width', this.value)">
-                            <div class="flex gap-1">
-                                <button class="text-xs border p-1 flex-1 hover:bg-gray-100" onclick="updateTextAlignment('left')">Sx</button>
-                                <button class="text-xs border p-1 flex-1 hover:bg-gray-100" onclick="updateTextAlignment('center')">Ctr</button>
-                                <button class="text-xs border p-1 flex-1 hover:bg-gray-100" onclick="updateTextAlignment('right')">Dx</button>
-                                <input type="hidden" id="text-align-hidden" value="center">
+                            
+                            <div class="mt-1">
+                                <label class="block text-[11px] font-bold text-gray-600 mb-1">Larghezza Max (A capo)</label>
+                                <input type="range" id="rng-width" min="100" max="1200" step="10" value="600" oninput="scheduleTextAutoApply()">
                             </div>
+                            
+                            <div class="mt-1">
+                                <label class="block text-[11px] font-bold text-gray-600 mb-1">Allineamento</label>
+                                <div class="flex gap-1">
+                                    <button class="text-xs border p-1.5 flex-1 hover:bg-gray-100 font-bold" onclick="updateTextAlignment('left')">Sx</button>
+                                    <button class="text-xs border p-1.5 flex-1 hover:bg-gray-100 font-bold" onclick="updateTextAlignment('center')">Ctr</button>
+                                    <button class="text-xs border p-1.5 flex-1 hover:bg-gray-100 font-bold" onclick="updateTextAlignment('right')">Dx</button>
+                                    <input type="hidden" id="text-align-hidden" value="center">
+                                </div>
+                            </div>
+                            
                             <div id="text-auto-status" class="text-[10px] text-gray-500 font-bold uppercase mb-2">Auto On</div>
                         </div>
                     </div>
